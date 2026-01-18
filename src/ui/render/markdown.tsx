@@ -4,6 +4,12 @@ import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 
 export default function MDContent({ text }: { text: string }) {
+  const handleLinkClick = (href: string) => {
+    if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+      window.electron.sendClientEvent({ type: "open.external", payload: { url: href } });
+    }
+  };
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -19,11 +25,15 @@ export default function MDContent({ text }: { text: string }) {
         strong: (props) => <strong className="text-ink-900 font-semibold" {...props} />,
         em: (props) => <em className="text-ink-800" {...props} />,
         a: (props) => (
-          <a 
-            className="text-accent hover:text-accent-hover underline cursor-pointer transition-colors" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            {...props} 
+          <a
+            className="text-accent hover:text-accent-hover underline cursor-pointer transition-colors"
+            onClick={(e) => {
+              e.preventDefault();
+              if (props.href) {
+                handleLinkClick(props.href);
+              }
+            }}
+            {...props}
           />
         ),
         pre: (props) => (
@@ -46,7 +56,24 @@ export default function MDContent({ text }: { text: string }) {
               {children}
             </code>
           );
-        }
+        },
+        // Markdown table components with borders
+        table: (props) => (
+          <div className="mt-3 overflow-x-auto rounded-lg border border-ink-900/20 bg-surface-tertiary">
+            <table className="w-full border-collapse text-sm" {...props} />
+          </div>
+        ),
+        thead: (props) => (
+          <thead className="border-b border-ink-900/20 bg-surface-secondary" {...props} />
+        ),
+        tbody: (props) => <tbody className="divide-y divide-ink-900/10" {...props} />,
+        tr: (props) => <tr className="hover:bg-surface-200/30 transition-colors" {...props} />,
+        th: (props) => (
+          <th className="border-r border-ink-900/10 px-3 py-2 text-left font-semibold text-ink-900 last:border-r-0" {...props} />
+        ),
+        td: (props) => (
+          <td className="border-r border-ink-900/10 px-3 py-2 text-ink-700 last:border-r-0" {...props} />
+        ),
       }}
     >
       {String(text ?? "")}
