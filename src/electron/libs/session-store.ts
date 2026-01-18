@@ -256,6 +256,7 @@ export class SessionStore {
     const fields: string[] = [];
     const values: Array<string | number | null> = [];
     const updatable = {
+      title: "title",
       claudeSessionId: "claude_session_id",
       status: "status",
       cwd: "cwd",

@@ -4,6 +4,7 @@ import type { ClientEvent, ServerEvent } from "./types.js";
 import { runClaude, type RunnerHandle } from "./libs/runner-openai.js"; // New OpenAI SDK runner
 import { SessionStore } from "./libs/session-store.js";
 import { loadApiSettings, saveApiSettings } from "./libs/settings-store.js";
+import { generateSessionTitle } from "./libs/util.js";
 import { app } from "electron";
 import { join } from "path";
 
@@ -159,11 +160,30 @@ export function handleClientEvent(event: ClientEvent) {
 
     // If session has no claudeSessionId yet (was created empty), treat this as first run
     const isFirstRun = !session.claudeSessionId;
+    
+    // Generate title for empty chats on first real prompt
+    let sessionTitle = session.title;
+    if (isFirstRun && session.title === "New Chat" && event.payload.prompt) {
+      // Generate title asynchronously but don't block
+      generateSessionTitle(event.payload.prompt)
+        .then((newTitle) => {
+          if (newTitle && newTitle !== "New Chat") {
+            sessions.updateSession(session.id, { title: newTitle });
+            emit({
+              type: "session.status",
+              payload: { sessionId: session.id, status: session.status, title: newTitle, cwd: session.cwd }
+            });
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to generate title for continued session:', err);
+        });
+    }
 
     sessions.updateSession(session.id, { status: "running", lastPrompt: event.payload.prompt });
     emit({
       type: "session.status",
-      payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd }
+      payload: { sessionId: session.id, status: "running", title: sessionTitle, cwd: session.cwd }
     });
 
     emit({
