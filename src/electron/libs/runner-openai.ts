@@ -192,7 +192,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       
       // Build system prompt with optional todos
       let systemContent = getSystemPrompt(currentCwd);
-      const todosSummary = getTodosSummary();
+      const todosSummary = getTodosSummary(session.id);
       if (todosSummary) {
         systemContent += todosSummary;
       }
@@ -211,12 +211,12 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       
       if (sessionStore && session.id) {
         const history = sessionStore.getSessionHistory(session.id);
-        
-        // Clear todos from previous session, then load from history
-        clearTodos();
+
+        // Clear todos from previous session for this sessionId, then load from history
+        clearTodos(session.id);
         if (history && history.todos && history.todos.length > 0) {
-          console.log(`[OpenAI Runner] Loading ${history.todos.length} todos from history`);
-          setTodos(history.todos);
+          console.log(`[OpenAI Runner] Loading ${history.todos.length} todos from history for session ${session.id}`);
+          setTodos(session.id, history.todos);
         }
         
         if (history && history.messages.length > 0) {
@@ -337,7 +337,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         cwd: session.cwd || 'No workspace folder',
         session_id: session.id,
         tools: activeTools.map(t => t.function.name),
-        model: guiSettings.model,
+        model: modelToUse,
         permissionMode: guiSettings.permissionMode || 'ask',
         memoryEnabled: guiSettings.enableMemory || false
       });
@@ -367,7 +367,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
 
         // Prepare request payload for logging
         const requestPayload = {
-          model: guiSettings.model,
+          model: modelToUse,
           messages: messages,
           tools: activeTools,
           temperature: guiSettings.temperature || 0.3,
