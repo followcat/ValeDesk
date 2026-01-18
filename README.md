@@ -19,6 +19,7 @@ https://github.com/user-attachments/assets/a8c54ce0-2fe0-40c3-8018-026cab9d7483
 ## ✨ Features
 
 ### Core Capabilities
+- ✅ **Task Planning** — visual todo panel with progress tracking, persisted per session
 - ✅ **OpenAI SDK** — full API control, compatible with any OpenAI-compatible endpoint
 - ✅ **Local Models** — vLLM, Ollama, LM Studio support
 - ✅ **WASM Sandbox** — secure JavaScript execution via QuickJS (no Node.js required)
@@ -30,7 +31,6 @@ https://github.com/user-attachments/assets/a8c54ce0-2fe0-40c3-8018-026cab9d7483
 
 ### UI/UX Features
 - ✅ **Modern Interface** — React + Electron with smooth auto-scroll and streaming
-- ✅ **Task Planning** — visual todo panel with progress tracking
 - ✅ **Message Editing** — edit and resend messages with history truncation
 - ✅ **Session Management** — pin important sessions, search through chat history
 - ✅ **Keyboard Shortcuts** — Cmd+Enter/Ctrl+Enter to send messages
