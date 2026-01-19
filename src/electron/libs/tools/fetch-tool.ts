@@ -300,10 +300,13 @@ export async function executeFetchTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to fetch ${url}: ${error.message}`,
+      error: `Failed to fetch ${url}: ${error.message}`,
     };
   }
 }
+
+// Backwards-compatible alias for older imports.
+export const executeFetchHtmlTool = executeFetchTool;
 
 export async function executeFetchJsonTool(
   args: {
@@ -331,7 +334,7 @@ export async function executeFetchJsonTool(
     if (!response.ok) {
       return {
         success: false,
-        output: `HTTP ${response.status}: ${response.statusText}`,
+        error: `HTTP ${response.status}: ${response.statusText}`,
       };
     }
 
@@ -344,7 +347,7 @@ export async function executeFetchJsonTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to fetch JSON from ${url}: ${error.message}`,
+      error: `Failed to fetch JSON from ${url}: ${error.message}`,
     };
   }
 }
@@ -354,6 +357,13 @@ export async function executeDownloadTool(
   context: ToolExecutionContext,
 ): Promise<ToolResult> {
   const { url, destination } = args;
+
+  if (!context.isPathSafe(destination)) {
+    return {
+      success: false,
+      error: `Access denied: Path is outside the working directory (${context.cwd})`,
+    };
+  }
 
   try {
     const response = await fetch(url, {
@@ -374,12 +384,13 @@ export async function executeDownloadTool(
     const buffer = Buffer.from(arrayBuffer);
 
     // Ensure directory exists
-    const dir = path.dirname(destination);
+    const fullPath = path.resolve(context.cwd, destination);
+    const dir = path.dirname(fullPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    fs.writeFileSync(destination, buffer);
+    fs.writeFileSync(fullPath, buffer);
 
     return {
       success: true,
@@ -388,7 +399,7 @@ export async function executeDownloadTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to download ${url}: ${error.message}`,
+      error: `Failed to download ${url}: ${error.message}`,
     };
   }
 }
