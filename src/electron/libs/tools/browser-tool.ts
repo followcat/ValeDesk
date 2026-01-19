@@ -85,7 +85,7 @@ export const BrowserClickToolDefinition: ToolDefinition = {
     description: `Click an element in the browser.
 
 **Parameters:**
-- selector: CSS selector or text to click (required)
+- selector: CSS selector to click (required)
 - timeout: Wait timeout in ms (default: 30000)
 
 **Returns:**
@@ -96,7 +96,7 @@ export const BrowserClickToolDefinition: ToolDefinition = {
       properties: {
         selector: {
           type: "string",
-          description: "CSS selector or text to click",
+          description: "CSS selector to click",
         },
         timeout: {
           type: "number",
@@ -413,7 +413,7 @@ export async function executeBrowserNavigateTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to navigate to ${url}: ${error.message}`,
+      error: `Failed to navigate to ${url}: ${error.message}`,
     };
   }
 }
@@ -437,7 +437,7 @@ export async function executeBrowserClickTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to click ${selector}: ${error.message}`,
+      error: `Failed to click ${selector}: ${error.message}`,
     };
   }
 }
@@ -459,7 +459,7 @@ export async function executeBrowserTypeTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to type into ${selector}: ${error.message}`,
+      error: `Failed to type into ${selector}: ${error.message}`,
     };
   }
 }
@@ -481,7 +481,7 @@ export async function executeBrowserSelectTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to select from ${selector}: ${error.message}`,
+      error: `Failed to select from ${selector}: ${error.message}`,
     };
   }
 }
@@ -503,7 +503,7 @@ export async function executeBrowserHoverTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to hover over ${selector}: ${error.message}`,
+      error: `Failed to hover over ${selector}: ${error.message}`,
     };
   }
 }
@@ -546,7 +546,7 @@ export async function executeBrowserScrollTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to scroll ${direction}: ${error.message}`,
+      error: `Failed to scroll ${direction}: ${error.message}`,
     };
   }
 }
@@ -568,7 +568,7 @@ export async function executeBrowserPressKeyTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to press key ${key}: ${error.message}`,
+      error: `Failed to press key ${key}: ${error.message}`,
     };
   }
 }
@@ -603,7 +603,7 @@ export async function executeBrowserWaitForTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Wait failed: ${error.message}`,
+      error: `Wait failed: ${error.message}`,
     };
   }
 }
@@ -623,7 +623,7 @@ export async function executeBrowserSnapshotTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to get snapshot: ${error.message}`,
+      error: `Failed to get snapshot: ${error.message}`,
     };
   }
 }
@@ -633,6 +633,13 @@ export async function executeBrowserScreenshotTool(
   context: ToolExecutionContext,
 ): Promise<ToolResult> {
   const { path, full_page = false } = args;
+
+  if (!context.isPathSafe(path)) {
+    return {
+      success: false,
+      error: `Access denied: Path is outside the working directory (${context.cwd})`,
+    };
+  }
 
   try {
     const page = await ensureBrowser();
@@ -645,7 +652,7 @@ export async function executeBrowserScreenshotTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Failed to take screenshot: ${error.message}`,
+      error: `Failed to take screenshot: ${error.message}`,
     };
   }
 }
@@ -667,7 +674,7 @@ export async function executeBrowserExecuteScriptTool(
   } catch (error: any) {
     return {
       success: false,
-      output: `Script execution failed: ${error.message}`,
+      error: `Script execution failed: ${error.message}`,
     };
   }
 }

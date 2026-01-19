@@ -115,16 +115,20 @@ export class ToolExecutor {
       this.extractPageTool = new ExtractPageContentTool(null, "tavily");
     }
 
-    // Initialize ZaiReader with fetch fallback
+    // Initialize ZaiReader with fetch fallback if enabled
     const zaiReaderApiUrl = apiSettings?.zaiReaderApiUrl || "default";
-    if (apiSettings?.enableZaiReader && apiSettings?.zaiApiKey) {
-      this.zaiReaderTool = new ZaiReaderTool(
-        apiSettings.zaiApiKey,
-        zaiReaderApiUrl,
-      );
+    if (apiSettings?.enableZaiReader) {
+      if (apiSettings?.zaiApiKey) {
+        this.zaiReaderTool = new ZaiReaderTool(
+          apiSettings.zaiApiKey,
+          zaiReaderApiUrl,
+        );
+      } else {
+        // Use fetch fallback (no API key required)
+        this.zaiReaderTool = new ZaiReaderTool(null, "default");
+      }
     } else {
-      // Use fetch fallback (no API key required)
-      this.zaiReaderTool = new ZaiReaderTool(null, "default");
+      this.zaiReaderTool = null;
     }
 
     // Initialize scheduler tool
@@ -210,6 +214,8 @@ export class ToolExecutor {
       "read_file",
       "execute_js",
       "read_document",
+      "download",
+      "browser_screenshot",
     ];
     if (fileOperationTools.includes(toolName)) {
       if (!this.cwd || this.cwd === "." || this.cwd === "") {

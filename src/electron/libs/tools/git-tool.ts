@@ -11,7 +11,7 @@
  * - git_commit: Commit staged changes
  */
 
-import { execSync } from "child_process";
+import { spawnSync } from "child_process";
 import type {
   ToolDefinition,
   ToolResult,
@@ -422,18 +422,18 @@ function runGit(
   args: string[],
   cwd: string,
 ): { output: string; error: string; exitCode: number } {
-  try {
-    const output = execSync(`git ${args.join(" ")}`, {
-      cwd,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    return { output: output.trim(), error: "", exitCode: 0 };
-  } catch (error: any) {
-    const output = error.stdout || "";
-    const stderr = error.stderr || "";
-    return { output, error: stderr, exitCode: error.status || 1 };
-  }
+  const result = spawnSync("git", args, {
+    cwd,
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+    windowsHide: true,
+  });
+
+  return {
+    output: (result.stdout || "").trim(),
+    error: (result.stderr || "").trim(),
+    exitCode: typeof result.status === "number" ? result.status : 1,
+  };
 }
 
 /**
