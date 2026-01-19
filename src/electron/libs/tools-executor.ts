@@ -36,6 +36,30 @@ import {
   executeGitResetTool,
   executeGitShowTool,
 } from "./tools/git-tool.js";
+import {
+  executeFetchTool,
+  executeFetchJsonTool,
+  executeFetchHtmlTool,
+  executeDownloadTool,
+} from "./tools/fetch-tool.js";
+import {
+  executeBrowserNavigateTool,
+  executeBrowserClickTool,
+  executeBrowserTypeTool,
+  executeBrowserSelectTool,
+  executeBrowserHoverTool,
+  executeBrowserScrollTool,
+  executeBrowserPressKeyTool,
+  executeBrowserWaitForTool,
+  executeBrowserSnapshotTool,
+  executeBrowserScreenshotTool,
+  executeBrowserExecuteScriptTool,
+} from "./tools/browser-tool.js";
+import {
+  executeSearchTool,
+  executeSearchNewsTool,
+  executeSearchImagesTool,
+} from "./tools/duckduckgo-search-tool.js";
 import type { SchedulerStore } from "./scheduler-store.js";
 
 export { ToolResult };
@@ -59,18 +83,16 @@ export class ToolExecutor {
     this.apiSettings = apiSettings;
 
     // Initialize web tools based on provider and API key availability
+    // Now these tools have fallbacks, so we can always initialize them
     const provider = apiSettings?.webSearchProvider || "tavily";
     const zaiApiUrl = apiSettings?.zaiApiUrl || "default";
+    
+    // Web search tool with DuckDuckGo fallback
     if (provider === "tavily" && apiSettings?.tavilyApiKey) {
       this.webSearchTool = new WebSearchTool(
         apiSettings.tavilyApiKey,
         "tavily",
         "default",
-      );
-      // Page extraction only available with Tavily
-      this.extractPageTool = new ExtractPageContentTool(
-        apiSettings.tavilyApiKey,
-        "tavily",
       );
     } else if (provider === "zai" && apiSettings?.zaiApiKey) {
       this.webSearchTool = new WebSearchTool(
@@ -78,14 +100,23 @@ export class ToolExecutor {
         "zai",
         zaiApiUrl,
       );
-      // Page extraction not available with Z.AI, leave as null
-      this.extractPageTool = null;
     } else {
-      this.webSearchTool = null;
-      this.extractPageTool = null;
+      // Use DuckDuckGo fallback (no API key required)
+      this.webSearchTool = new WebSearchTool(null, "tavily", "default");
+    }
+    
+    // Page extraction with fetch fallback
+    if (provider === "tavily" && apiSettings?.tavilyApiKey) {
+      this.extractPageTool = new ExtractPageContentTool(
+        apiSettings.tavilyApiKey,
+        "tavily",
+      );
+    } else {
+      // Use fetch fallback (no API key required)
+      this.extractPageTool = new ExtractPageContentTool(null, "tavily");
     }
 
-    // Initialize ZaiReader if enabled and Z.AI API key is available
+    // Initialize ZaiReader with fetch fallback
     const zaiReaderApiUrl = apiSettings?.zaiReaderApiUrl || "default";
     if (apiSettings?.enableZaiReader && apiSettings?.zaiApiKey) {
       this.zaiReaderTool = new ZaiReaderTool(
@@ -93,7 +124,9 @@ export class ToolExecutor {
         zaiReaderApiUrl,
       );
     } else {
-      this.zaiReaderTool = null;
+      // Use fetch fallback (no API key required)
+      this.zaiReaderTool = new ZaiReaderTool(null, "default");
+    }
 
       // Initialize scheduler tool
       if (schedulerStore) {
@@ -271,6 +304,63 @@ export class ToolExecutor {
 
         case "git_show":
           return await executeGitShowTool(args as any, context);
+
+        // Fetch tools
+        case "fetch":
+          return await executeFetchTool(context);
+
+        case "fetch_json":
+          return await executeFetchJsonTool(context);
+
+        case "fetch_html":
+          return await executeFetchHtmlTool(context);
+
+        case "download":
+          return await executeDownloadTool(context);
+
+        // Browser automation tools
+        case "browser_navigate":
+          return await executeBrowserNavigateTool(context);
+
+        case "browser_click":
+          return await executeBrowserClickTool(context);
+
+        case "browser_type":
+          return await executeBrowserTypeTool(context);
+
+        case "browser_select":
+          return await executeBrowserSelectTool(context);
+
+        case "browser_hover":
+          return await executeBrowserHoverTool(context);
+
+        case "browser_scroll":
+          return await executeBrowserScrollTool(context);
+
+        case "browser_press_key":
+          return await executeBrowserPressKeyTool(context);
+
+        case "browser_wait_for":
+          return await executeBrowserWaitForTool(context);
+
+        case "browser_snapshot":
+          return await executeBrowserSnapshotTool(context);
+
+        case "browser_screenshot":
+          return await executeBrowserScreenshotTool(context);
+
+        case "browser_execute_script":
+          return await executeBrowserExecuteScriptTool(context);
+
+        // DuckDuckGo search tools
+        case "search":
+          return await executeSearchTool(context);
+
+        case "search_news":
+          return await executeSearchNewsTool(context);
+
+        case "search_images":
+          return await executeSearchImagesTool(context);
 
         case "Scheduler":
           return await this.executeScheduleTask(args, context);

@@ -19,6 +19,9 @@ export * from './grep-tool.js';
 export * from './web-search.js';
 export * from './extract-page-content.js';
 export * from './zai-reader.js';
+export * from './fetch-tool.js';
+export * from './browser-tool.js';
+export * from './duckduckgo-search-tool.js';
 
 // Memory tool
 export * from './memory-tool.js';
@@ -58,6 +61,9 @@ import { RenderPageToolDefinition } from './render-page-tool.js';
 import { ManageTodosToolDefinition } from './manage-todos-tool.js';
 import { ScheduleTaskToolDefinition } from './schedule-task-tool.js';
 import { ALL_GIT_TOOL_DEFINITIONS } from './git-tool.js';
+import { ALL_FETCH_TOOL_DEFINITIONS } from './fetch-tool.js';
+import { ALL_BROWSER_TOOL_DEFINITIONS } from './browser-tool.js';
+import { ALL_SEARCH_TOOL_DEFINITIONS } from './duckduckgo-search-tool.js';
 
 export const ALL_TOOL_DEFINITIONS = [
   BashToolDefinition,
@@ -75,5 +81,8 @@ export const ALL_TOOL_DEFINITIONS = [
   RenderPageToolDefinition,
   ManageTodosToolDefinition,
   ScheduleTaskToolDefinition,
-  ...ALL_GIT_TOOL_DEFINITIONS
+  ...ALL_GIT_TOOL_DEFINITIONS,
+  ...ALL_FETCH_TOOL_DEFINITIONS,
+  ...ALL_BROWSER_TOOL_DEFINITIONS,
+  ...ALL_SEARCH_TOOL_DEFINITIONS
 ];

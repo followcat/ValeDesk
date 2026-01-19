@@ -60,6 +60,7 @@
 		"openai": "^6.16.0",
 		"os-utils": "^0.0.14",
 		"pdf-parse": "^1.1.1",
+		"playwright": "^1.49.0",
 		"quickjs-emscripten": "^0.31.0",
 		"react": "^19.2.3",
 		"react-dom": "^19.2.3",

@@ -26,7 +26,10 @@ export const GitStatusToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "git_status",
-    description: `Get the current status of a git repository.
+    description: `Get the current status of a LOCAL git repository.
+
+**IMPORTANT:** This tool works on local repositories only (already cloned on your filesystem).
+For remote GitHub URLs, use browser/web tools or GitHub API tools instead.
 
 **Output includes:**
 - Current branch name
@@ -35,7 +38,7 @@ export const GitStatusToolDefinition: ToolDefinition = {
 - Untracked files (new files)
 
 **Use cases:**
-- Check what files have been changed
+- Check what files have been changed in the local repository
 - Verify all changes are accounted for before committing
 - See if working directory is clean`,
     parameters: {
@@ -50,7 +53,10 @@ export const GitLogToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "git_log",
-    description: `Get the commit history of a git repository.
+    description: `Get the commit history of a LOCAL git repository.
+
+**IMPORTANT:** This tool works on local repositories only.
+For remote GitHub URLs, use GitHub API tools (e.g., mcp_github_list_commits).
 
 **Output includes:**
 - Commit hash (full)
@@ -62,7 +68,7 @@ export const GitLogToolDefinition: ToolDefinition = {
 - limit: Number of commits to show (default: 10, max: 100)
 
 **Use cases:**
-- Review recent changes
+- Review recent changes in the local repository
 - Find when a bug was introduced
 - See who made specific changes`,
     parameters: {
@@ -83,7 +89,9 @@ export const GitDiffToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "git_diff",
-    description: `Show uncommitted changes in the working directory.
+    description: `Show uncommitted changes in the LOCAL working directory.
+
+**IMPORTANT:** This tool works on local repositories only.
 
 **What it shows:**
 - Files that have been modified
@@ -114,13 +122,16 @@ export const GitBranchToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "git_branch",
-    description: `List all branches or show the current branch.
+    description: `List all branches or show the current branch in a LOCAL repository.
+
+**IMPORTANT:** This tool works on local repositories only.
+For remote GitHub URLs, use GitHub API tools (e.g., mcp_github_list_branches).
 
 **Options:**
 - list_all: If true, list all branches (local and remote). If false, show only current branch (default: false)
 
 **Use cases:**
-- See what branches exist
+- See what branches exist locally
 - Know which branch you're currently on
 - Plan branch switching strategy`,
     parameters: {
@@ -140,7 +151,9 @@ export const GitCheckoutToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "git_checkout",
-    description: `Switch branches or restore files to a previous state.
+    description: `Switch branches or restore files to a previous state in a LOCAL repository.
+
+**IMPORTANT:** This tool works on local repositories only.
 
 **Operations:**
 1. Switch branches: Provide 'branch' parameter
@@ -173,7 +186,9 @@ export const GitAddToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "git_add",
-    description: `Stage files for commit.
+    description: `Stage files for commit in a LOCAL repository.
+
+**IMPORTANT:** This tool works on local repositories only.
 
 **Options:**
 - all: Stage all changed files (default: true)
@@ -205,7 +220,9 @@ export const GitCommitToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "git_commit",
-    description: `Create a commit with staged changes.
+    description: `Create a commit with staged changes in a LOCAL repository.
+
+**IMPORTANT:** This tool works on local repositories only.
 
 **Required:**
 - message: Commit message describing the changes
@@ -232,7 +249,9 @@ export const GitPushToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "git_push",
-    description: `Push commits to a remote repository.
+    description: `Push commits from LOCAL repository to a remote repository.
+
+**IMPORTANT:** This tool works on local repositories only.
 
 **Options:**
 - remote: Remote name (default: origin)
@@ -270,7 +289,9 @@ export const GitPullToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "git_pull",
-    description: `Pull changes from a remote repository.
+    description: `Pull changes from a remote repository to LOCAL repository.
+
+**IMPORTANT:** This tool works on local repositories only.
 
 **Options:**
 - remote: Remote name (default: origin)
@@ -308,7 +329,9 @@ export const GitResetToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "git_reset",
-    description: `Reset current HEAD to a specified state.
+    description: `Reset current HEAD to a specified state in a LOCAL repository.
+
+**IMPORTANT:** This tool works on local repositories only.
 
 **Modes:**
 - soft: Keep changes staged (default)
@@ -352,7 +375,10 @@ export const GitShowToolDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "git_show",
-    description: `Show detailed information about a specific commit.
+    description: `Show detailed information about a specific commit in a LOCAL repository.
+
+**IMPORTANT:** This tool works on local repositories only.
+For remote GitHub URLs, use GitHub API tools (e.g., mcp_github_get_commit).
 
 **Output includes:**
 - Commit hash, author, date
