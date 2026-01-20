@@ -170,7 +170,7 @@ export function MultiThreadPanel({
                   Threads working together
                 </div>
                 <div className="space-y-1 max-h-28 overflow-y-auto">
-                  {threads.map((thread, idx) => {
+                  {threads.map((thread) => {
                     const isSummaryThread = thread.id === task.summaryThreadId;
                     return (
                       <button
