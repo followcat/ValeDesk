@@ -153,6 +153,7 @@ export type ServerEvent =
   | { type: "thread.list"; payload: { sessionId: string; threads: ThreadInfo[] } }
   | { type: "task.created"; payload: { task: MultiThreadTask; threads: CreatedThreadInfo[] } }
   | { type: "task.status"; payload: { taskId: string; status: 'running' | 'completed' | 'error' } }
+  | { type: "task.deleted"; payload: { taskId: string } }
   | { type: "task.error"; payload: { message: string } };
 
 // Client -> Server events

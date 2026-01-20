@@ -116,7 +116,7 @@ export function MultiThreadPanel({
 
               {/* Thread list - mini */}
               <div className="mt-2 space-y-1 max-h-24 overflow-y-auto">
-                {threads.map((thread, idx) => (
+                {threads.map((thread) => (
                   <button
                     key={thread.id}
                     onClick={() => onSelectSession(thread.id)}

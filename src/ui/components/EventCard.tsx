@@ -90,8 +90,9 @@ const SessionResult = ({ message, fileChanges, sessionId, onConfirmChanges, onRo
     file_path: fc.path,
     lines_added: fc.additions,
     lines_removed: fc.deletions,
-    content_old: fc.diff, // Using diff field as old content reference
-    content_new: undefined, // Could store new content separately
+    // FileChange currently only tracks path + line counts; no diff content available here.
+    content_old: undefined,
+    content_new: undefined,
   }));
 
   const handleViewDiff = (file: ChangedFile) => {

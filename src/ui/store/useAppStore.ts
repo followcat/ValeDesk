@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ServerEvent, SessionStatus, StreamMessage, TodoItem, FileChange, MultiThreadTask, SessionInfo } from "../types";
+import type { ServerEvent, SessionStatus, StreamMessage, TodoItem, FileChange, MultiThreadTask } from "../types";
 
 export type PermissionRequest = {
   toolUseId: string;
