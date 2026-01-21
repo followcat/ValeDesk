@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ServerEvent, SessionStatus, StreamMessage, TodoItem, FileChange, MultiThreadTask, LLMModel, LLMProvider, LLMProviderSettings } from "../types";
+import { shouldMarkHistoryStale } from "../utils/history-sync";
 
 export type PermissionRequest = {
   toolUseId: string;
@@ -227,6 +228,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         set((state) => {
           const existing = state.sessions[sessionId] ?? createSession(sessionId);
+          const markStale = shouldMarkHistoryStale(
+            state.activeSessionId,
+            sessionId,
+            status,
+          );
+          const nextHistoryRequested = markStale
+            ? new Set(state.historyRequested)
+            : state.historyRequested;
+          if (markStale) {
+            nextHistoryRequested.delete(sessionId);
+          }
           return {
             sessions: {
               ...state.sessions,
@@ -240,9 +252,10 @@ export const useAppStore = create<AppState>((set, get) => ({
                 updatedAt: Date.now(),
                 // Mark as hydrated if this is a new session we just started
                 // This prevents session.history from overwriting new messages
-                hydrated: isPendingStart ? true : existing.hydrated
+                hydrated: markStale ? false : isPendingStart ? true : existing.hydrated
               }
-            }
+            },
+            historyRequested: nextHistoryRequested
           };
         });
 

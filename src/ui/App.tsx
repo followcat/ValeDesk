@@ -14,11 +14,13 @@ import { MessageCard } from "./components/EventCard";
 import { AppFooter } from "./components/AppFooter";
 import { TodoPanel } from "./components/TodoPanel";
 import MDContent from "./render/markdown";
+import { shouldHandlePartialMessage } from "./utils/partial-stream";
 
 function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const partialMessageRef = useRef("");
+  const partialSessionIdRef = useRef<string | null>(null);
   const [partialMessage, setPartialMessage] = useState("");
   const [showPartialMessage, setShowPartialMessage] = useState(false);
   const isUserScrolledUpRef = useRef(false);
@@ -72,7 +74,11 @@ function App() {
     if (partialEvent.type !== "stream.message" || partialEvent.payload.message.type !== "stream_event") return;
 
     const message = partialEvent.payload.message as any;
+    const eventSessionId = partialEvent.payload.sessionId;
+    if (!shouldHandlePartialMessage(activeSessionId, eventSessionId)) return;
+
     if (message.event.type === "content_block_start") {
+      partialSessionIdRef.current = eventSessionId;
       partialMessageRef.current = "";
       setPartialMessage(partialMessageRef.current);
       setShowPartialMessage(true);
@@ -94,17 +100,18 @@ function App() {
     if (message.event.type === "content_block_stop") {
       // Cancel any scheduled update
       partialUpdateScheduledRef.current = false;
-      
+
       // Force final update
       setPartialMessage(partialMessageRef.current);
       
       setShowPartialMessage(false);
+      partialSessionIdRef.current = null;
       setTimeout(() => {
         partialMessageRef.current = "";
         setPartialMessage(partialMessageRef.current);
       }, 500);
     }
-  }, []);
+  }, [activeSessionId]);
 
   // Combined event handler
   const onEvent = useCallback((event: ServerEvent) => {
@@ -180,6 +187,18 @@ function App() {
       sendEvent({ type: "session.history", payload: { sessionId: activeSessionId } });
     }
   }, [activeSessionId, connected, sessions, historyRequested, markHistoryRequested, sendEvent]);
+
+  useEffect(() => {
+    if (!activeSessionId || !connected) return;
+    sendEvent({ type: "session.subscribe", payload: { sessionId: activeSessionId } });
+  }, [activeSessionId, connected, sendEvent]);
+
+  useEffect(() => {
+    partialSessionIdRef.current = null;
+    partialMessageRef.current = "";
+    setPartialMessage("");
+    setShowPartialMessage(false);
+  }, [activeSessionId]);
 
   // Track user scroll position to disable auto-scroll when user scrolls up
   useEffect(() => {

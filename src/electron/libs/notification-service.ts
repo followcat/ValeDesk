@@ -1,4 +1,4 @@
-import { Notification } from 'electron';
+import { Notification } from "electron";
 
 type Meta = any;
 
@@ -8,20 +8,24 @@ export function setNotificationClickHandler(fn: (meta?: Meta) => void) {
   clickHandler = fn;
 }
 
-export async function sendNotification(title: string, body: string, meta?: Meta) {
+export async function sendNotification(
+  title: string,
+  body: string,
+  meta?: Meta,
+) {
   try {
     const n = new Notification({ title, body, silent: false });
-    n.on('click', () => {
+    n.on("click", () => {
       try {
         clickHandler(meta);
       } catch (e) {
-        console.error('[NotificationService] click handler error', e);
+        console.error("[NotificationService] click handler error", e);
       }
     });
     n.show();
     return { success: true };
   } catch (error: any) {
-    console.error('[NotificationService] Failed to send notification:', error);
+    console.error("[NotificationService] Failed to send notification:", error);
     return { success: false, error: String(error) };
   }
 }
