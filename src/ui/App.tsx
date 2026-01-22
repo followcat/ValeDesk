@@ -496,10 +496,6 @@ function App() {
                   onConfirmChanges={handleConfirmChanges}
                   onRollbackChanges={handleRollbackChanges}
                   onRetry={handleRetry}
-                  fileChanges={activeSession?.fileChanges}
-                  sessionId={activeSessionId || undefined}
-                  onConfirmChanges={handleConfirmChanges}
-                  onRollbackChanges={handleRollbackChanges}
                 />
               ))
             )}
