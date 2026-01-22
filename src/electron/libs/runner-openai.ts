@@ -704,17 +704,6 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           });
           return;
         }
-=======
-          throw lastError ?? new Error('Unknown stream error');
-        };
-
-        const { assistantMessage, toolCalls, rawJsonResponse } = await runStreamWithRetries();
-        
-        // Log unified raw JSON response
-        console.log('[OpenAI Runner] ===== RAW JSON RESPONSE =====');
-        console.log(JSON.stringify(rawJsonResponse, null, 2));
-        console.log('[OpenAI Runner] ===== END RAW JSON RESPONSE =====');
->>>>>>> c3ae68c (fix: add retry handling for dropped streams)
         
         // Accumulate token usage
         if (streamMetadata.usage) {
@@ -1144,7 +1133,9 @@ DO NOT call the same tool again with similar arguments.`
 
       const retryable = Boolean((error as any)?.retryable);
       const retryAttempts = (error as any)?.retryAttempts ?? 0;
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Extract detailed error message from API response
+      let errorMessage = error instanceof Error ? error.message : String(error);
 
       sendMessage('result', {
         subtype: 'error',
@@ -1163,9 +1154,6 @@ DO NOT call the same tool again with similar arguments.`
         retryPrompt: prompt,
         retryAttempts: retryAttempts
       });
-      
-      // Extract detailed error message from API response
-      let errorMessage = String(error);
       
       // Check for timeout errors
       if (error.name === 'TimeoutError' || error.message?.includes('timeout') || error.code === 'ETIMEDOUT') {

@@ -3,11 +3,14 @@ const { spawn, spawnSync } = require('child_process');
 
 const isWindows = process.platform === 'win32';
 
-if (!isWindows) {
-  spawnSync('npm', ['run', 'dev:clean'], { stdio: 'inherit', shell: true });
-}
+// Run cleanup on all platforms
+spawnSync('npm', ['run', 'dev:clean'], { 
+  stdio: 'inherit', 
+  shell: isWindows 
+});
 
-const electronCommand = isWindows ? 'npm run dev:electron:delayed' : 'npm run dev:electron';
+// Use delayed electron on all platforms for consistency
+const electronCommand = 'npm run dev:electron:delayed';
 
 const args = [
   '-k',
@@ -20,7 +23,10 @@ const args = [
   electronCommand
 ];
 
-const proc = spawn('concurrently', args, { stdio: 'inherit', shell: true });
+const proc = spawn('concurrently', args, { 
+  stdio: 'inherit', 
+  shell: isWindows 
+});
 
 ['SIGINT', 'SIGTERM'].forEach((signal) => {
   process.on(signal, () => {

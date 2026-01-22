@@ -31,10 +31,10 @@
 	"type": "module",
 	"main": "dist-electron/main.js",
 	"scripts": {
-		"dev:clean": "pkill -f \"[v]ite\\\\b\" 2>/dev/null || true; pkill -f \"[e]lectron\\\\s+\\\\.\" 2>/dev/null || true",
+		"dev:clean": "node scripts/dev-clean.cjs",
 		"dev": "node scripts/dev.cjs",
 		"dev:win": "concurrently -k --kill-others-on-fail -n react,electron -c cyan,magenta \"npm run dev:react\" \"npm run dev:electron:delayed\"",
-		"dev:electron:delayed": "node -e \"setTimeout(()=>{},5000)\" && npm run transpile:electron && cross-env NODE_ENV=development electron . --no-sandbox",
+		"dev:electron:delayed": "node scripts/dev-electron-delayed.cjs",
 		"dev:react": "vite --host 0.0.0.0 --port 5173 --strictPort",
 		"dev:electron": "npm run transpile:electron && cross-env NODE_ENV=development electron . --no-sandbox",
 		"build": "tsc -b && vite build",

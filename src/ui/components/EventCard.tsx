@@ -502,7 +502,7 @@ export function MessageCard({
   onPermissionResult,
   onEditMessage,
   onRetry,
-  messageIndex
+  messageIndex,
   fileChanges,
   sessionId,
   onConfirmChanges,
