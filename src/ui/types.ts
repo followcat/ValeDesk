@@ -126,6 +126,7 @@ export type ApiSettings = {
   enableBrowserTools?: boolean; // Enable browser_* tools (11 tools)
   enableDuckDuckGo?: boolean; // Enable search/search_news/search_images (no API key needed)
   enableFetchTools?: boolean; // Enable fetch/fetch_json/download tools
+  enableImageTools?: boolean; // Enable attach_image tool
   llmProviders?: LLMProviderSettings; // LLM providers and models configuration
 };
 

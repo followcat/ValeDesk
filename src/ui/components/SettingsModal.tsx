@@ -45,6 +45,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
   const [enableBrowserTools, setEnableBrowserTools] = useState(currentSettings?.enableBrowserTools || false);
   const [enableDuckDuckGo, setEnableDuckDuckGo] = useState(currentSettings?.enableDuckDuckGo || false);
   const [enableFetchTools, setEnableFetchTools] = useState(currentSettings?.enableFetchTools || false);
+  const [enableImageTools, setEnableImageTools] = useState(currentSettings?.enableImageTools ?? false);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [showTavilyPassword, setShowTavilyPassword] = useState(false);
   const [showZaiPassword, setShowZaiPassword] = useState(false);
@@ -102,6 +103,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       setEnableBrowserTools(currentSettings.enableBrowserTools || false);
       setEnableDuckDuckGo(currentSettings.enableDuckDuckGo || false);
       setEnableFetchTools(currentSettings.enableFetchTools || false);
+      setEnableImageTools(currentSettings.enableImageTools ?? false);
     }
     
     // ALWAYS load LLM providers from separate file
@@ -228,6 +230,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       enableBrowserTools,
       enableDuckDuckGo,
       enableFetchTools,
+      enableImageTools,
       llmProviders: llmProviderSettings
     };
     
@@ -266,6 +269,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
     setEnableBrowserTools(false);
     setEnableDuckDuckGo(false);
     setEnableFetchTools(false);
+    setEnableImageTools(false);
   };
 
   useEffect(() => {
@@ -379,6 +383,8 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
                 setEnableDuckDuckGo={setEnableDuckDuckGo}
                 enableFetchTools={enableFetchTools}
                 setEnableFetchTools={setEnableFetchTools}
+                enableImageTools={enableImageTools}
+                setEnableImageTools={setEnableImageTools}
               />
             ) : (
               <MemoryModeTab
@@ -1246,7 +1252,9 @@ function ToolsTab({
   enableDuckDuckGo,
   setEnableDuckDuckGo,
   enableFetchTools,
-  setEnableFetchTools
+  setEnableFetchTools,
+  enableImageTools,
+  setEnableImageTools
 }: any) {
   return (
     <div className="px-6 py-4 space-y-6">
@@ -1326,6 +1334,25 @@ function ToolsTab({
               type="checkbox"
               checked={enableFetchTools}
               onChange={(e) => setEnableFetchTools(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-ink-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+          </div>
+        </label>
+
+        {/* Image Tools */}
+        <label className="flex items-center justify-between cursor-pointer mt-4">
+          <div className="flex-1">
+            <span className="block text-sm font-medium text-ink-700">Image Attachments</span>
+            <p className="mt-0.5 text-xs text-ink-500">
+              1 tool: attach_image — convert local images to WebP for model input
+            </p>
+          </div>
+          <div className="relative">
+            <input
+              type="checkbox"
+              checked={enableImageTools}
+              onChange={(e) => setEnableImageTools(e.target.checked)}
               className="sr-only peer"
             />
             <div className="w-11 h-6 bg-ink-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>

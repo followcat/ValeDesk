@@ -36,7 +36,7 @@ const DEFAULT_CWD = process.cwd();
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
+  content: any;
   tool_calls?: any[];
   tool_call_id?: string;
   name?: string;
@@ -66,6 +66,29 @@ const logTurn = (sessionId: string, iteration: number, type: 'request' | 'respon
   } catch (error) {
     console.error(`[OpenAI Runner] Failed to write ${type} log:`, error);
   }
+};
+
+const redactMessagesForLog = (messages: ChatMessage[]) => {
+  return messages.map((message) => {
+    if (!Array.isArray(message.content)) return message;
+
+    const sanitized = message.content.map((item: any) => {
+      if (item?.type !== 'image_url' || !item.image_url?.url) return item;
+      const url = item.image_url.url;
+      const placeholder = typeof url === 'string' && url.startsWith('data:')
+        ? 'data:image/webp;base64,<redacted>'
+        : url;
+      return {
+        ...item,
+        image_url: {
+          ...item.image_url,
+          url: placeholder
+        }
+      };
+    });
+
+    return { ...message, content: sanitized };
+  });
 };
 
 
@@ -489,7 +512,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         // Log request to file
         const requestPayload = {
           model: modelName,
-          messages,
+          messages: redactMessagesForLog(messages),
           tools: activeTools,
           temperature,
           timestamp: new Date().toISOString()
@@ -820,6 +843,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
 
         // Execute tools
         const toolResults: ChatMessage[] = [];
+        const followUpMessages: ChatMessage[] = [];
 
         for (const toolCall of toolCalls) {
           if (aborted) {
@@ -898,6 +922,17 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
               });
             }
           });
+
+          if (toolName === 'attach_image' && result.success && result.data && (result.data as any).dataUrl) {
+            const data = result.data as { dataUrl: string; fileName?: string };
+            followUpMessages.push({
+              role: 'user',
+              content: [
+                { type: 'text', text: `Attached image: ${data.fileName || 'image'}` },
+                { type: 'image_url', image_url: { url: data.dataUrl } }
+              ]
+            });
+          }
 
           // If Memory tool was executed successfully, reload memory for next iteration
           if (toolName === 'manage_memory' && result.success) {
@@ -992,7 +1027,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         }
         
         // Add all tool results to messages
-        messages.push(...toolResults);
+        messages.push(...toolResults, ...followUpMessages);
         
         // Add loop-breaking hint if loop was detected
         if (loopHintAdded && loopRetryCount > 0) {
