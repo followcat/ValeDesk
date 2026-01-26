@@ -108,6 +108,12 @@ npm install
 make dev
 ```
 
+### Tests
+
+```bash
+npm run test
+```
+
 ### Build Standalone App
 
 ```bash
