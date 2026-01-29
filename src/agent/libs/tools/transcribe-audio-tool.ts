@@ -84,9 +84,10 @@ export async function transcribeAudio(
       baseURL: baseUrl || 'https://api.openai.com/v1'
     });
 
-    // Create File object for upload
+    // Create File object for upload - convert Buffer to Uint8Array for compatibility
     const fileName = basename(absolutePath);
-    const file = new File([fileBuffer], fileName, {
+    const uint8Array = new Uint8Array(fileBuffer);
+    const file = new File([uint8Array], fileName, {
       type: getAudioMimeType(fileName)
     });
 

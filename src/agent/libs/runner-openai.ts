@@ -1114,6 +1114,16 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           
           console.log(`[tool] ${toolName}`);
           
+          const toolStartTime = Date.now();
+          
+          // Log tool execution start
+          executionLogger.logToolExecution({
+            toolName,
+            toolUseId,
+            input: toolArgs,
+            status: 'start'
+          });
+          
           if (permissionMode === 'ask') {
             // Send permission request and wait for user approval
             sendPermissionRequest(toolUseId, toolName, toolArgs, toolArgs.explanation);
@@ -1193,14 +1203,16 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           });
           
           // Log successful execution
+          const resultOutput = result.success ? result.output : `Error: ${result.error}`;
+          const truncatedResult = typeof resultOutput === 'string' && resultOutput.length > 500 
+            ? `${resultOutput.substring(0, 500)}... (truncated)` 
+            : resultOutput;
           executionLogger.logToolExecution({
             toolName,
             toolUseId,
             input: toolArgs,
-            status: 'success',
-            result: typeof result === 'string' && result.length > 500 
-              ? `${result.substring(0, 500)}... (truncated)` 
-              : result,
+            status: result.success ? 'success' : 'error',
+            result: truncatedResult,
             durationMs: Date.now() - toolStartTime
           });
 

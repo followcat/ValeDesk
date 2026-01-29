@@ -439,15 +439,15 @@ export class ToolExecutor {
         case "transcribe_audio":
           return await transcribeAudio(args as any, {
             cwd: context.cwd,
-            apiKey: this.settings?.apiKey || '',
-            baseUrl: this.settings?.baseUrl
+            apiKey: this.apiSettings?.apiKey || '',
+            baseUrl: this.apiSettings?.baseUrl
           });
 
         case "generate_image":
           return await generateImage(args as any, {
             cwd: context.cwd,
-            apiKey: this.settings?.apiKey || '',
-            baseUrl: this.settings?.baseUrl
+            apiKey: this.apiSettings?.apiKey || '',
+            baseUrl: this.apiSettings?.baseUrl
           });
 
         default:
