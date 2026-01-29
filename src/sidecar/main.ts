@@ -1,5 +1,8 @@
 import readline from "node:readline";
-import type { ClientEvent, Attachment } from "../ui/types.js";
+import crypto from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import type { ClientEvent, Attachment, ApiSettings } from "../ui/types.js";
 import type { ServerEvent } from "../agent/types.js";
 import type { SidecarInboundMessage, SidecarOutboundMessage } from "./protocol.js";
 
@@ -286,8 +289,27 @@ function startRunner(sessionId: string, prompt: string, attachments?: Attachment
 }
 
 function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" }>) {
+  let resolvedCwd = event.payload.cwd;
+  let forcedSessionId: string | undefined;
+
+  // If no workspace was specified, optionally use the configured conversation data dir.
+  if (!resolvedCwd || !resolvedCwd.trim()) {
+    try {
+      const settings = loadApiSettings() as (ApiSettings & { conversationDataDir?: string }) | null;
+      const baseDir = settings?.conversationDataDir;
+      if (baseDir && baseDir.trim()) {
+        forcedSessionId = crypto.randomUUID();
+        resolvedCwd = join(baseDir, forcedSessionId);
+        mkdirSync(resolvedCwd, { recursive: true });
+      }
+    } catch {
+      // Ignore; fall back to no-workspace mode
+    }
+  }
+
   const session = sessions.createSession({
-    cwd: event.payload.cwd,
+    id: forcedSessionId,
+    cwd: resolvedCwd,
     title: event.payload.title,
     allowedTools: event.payload.allowedTools,
     prompt: event.payload.prompt,
@@ -296,7 +318,8 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
     temperature: event.payload.temperature,
   });
 
-  if (!event.payload.prompt || event.payload.prompt.trim() === "") {
+  const hasAttachments = Array.isArray(event.payload.attachments) && event.payload.attachments.length > 0;
+  if ((!event.payload.prompt || event.payload.prompt.trim() === "") && !hasAttachments) {
     sessions.updateSession(session.id, { status: "idle", lastPrompt: "" });
     emit({
       type: "session.status",
