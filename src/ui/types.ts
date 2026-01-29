@@ -1,8 +1,21 @@
 import type { SDKMessage, PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 
+// Attachment types for multimodal support
+export type AttachmentType = 'image' | 'video' | 'audio';
+
+export interface Attachment {
+  id: string;
+  type: AttachmentType;
+  name: string;
+  mimeType: string;
+  dataUrl: string; // base64 data URL
+  size: number; // bytes
+}
+
 export type UserPromptMessage = {
   type: "user_prompt";
   prompt: string;
+  attachments?: Attachment[];
 };
 
 export type StreamMessage = SDKMessage | UserPromptMessage;
@@ -220,8 +233,8 @@ export type ServerEvent =
 
 // Client -> Server events
 export type ClientEvent =
-  | { type: "session.start"; payload: { title: string; prompt: string; cwd?: string; model?: string; allowedTools?: string; threadId?: string; temperature?: number } }
-  | { type: "session.continue"; payload: { sessionId: string; prompt: string; retry?: boolean; retryReason?: string } }
+  | { type: "session.start"; payload: { title: string; prompt: string; cwd?: string; model?: string; allowedTools?: string; threadId?: string; temperature?: number; attachments?: Attachment[] } }
+  | { type: "session.continue"; payload: { sessionId: string; prompt: string; retry?: boolean; retryReason?: string; attachments?: Attachment[] } }
   | { type: "session.stop"; payload: { sessionId: string; } }
   | { type: "session.delete"; payload: { sessionId: string; } }
   | { type: "session.pin"; payload: { sessionId: string; isPinned: boolean; } }

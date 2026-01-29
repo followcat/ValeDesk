@@ -6,12 +6,11 @@ import type {
   SDKResultMessage,
   SDKUserMessage
 } from "@anthropic-ai/claude-agent-sdk";
-import type { StreamMessage } from "../types";
+import type { StreamMessage, Attachment, FileChange } from "../types";
 import type { PermissionRequest } from "../store/useAppStore";
 import MDContent from "../render/markdown";
 import { DecisionPanel } from "./DecisionPanel";
 import { ChangedFiles, type ChangedFile } from "./ChangedFiles";
-import type { FileChange } from "../types";
 
 type MessageContent = SDKAssistantMessage["message"]["content"][number];
 type ToolResultContent = SDKUserMessage["message"]["content"][number];
@@ -437,12 +436,61 @@ const SystemInfoCard = ({ message, showIndicator = false }: { message: SDKMessag
   );
 };
 
+// Attachment preview for displaying attached files in user messages
+/** Renders attached media (image, video, audio) in user messages */
+const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
+  if (attachment.type === 'image') {
+    return (
+      <div className="mt-2">
+        <img
+          src={attachment.dataUrl}
+          alt={`Attached image: ${attachment.name}`}
+          className="max-w-xs max-h-48 rounded-lg object-contain"
+        />
+        <div className="text-xs text-muted mt-1">{attachment.name}</div>
+      </div>
+    );
+  }
+  
+  if (attachment.type === 'video') {
+    return (
+      <div className="mt-2">
+        <video
+          src={attachment.dataUrl}
+          controls
+          className="max-w-xs max-h-48 rounded-lg"
+          aria-label={`Video: ${attachment.name}`}
+        >
+          <track kind="captions" />
+        </video>
+        <div className="text-xs text-muted mt-1">{attachment.name}</div>
+      </div>
+    );
+  }
+  
+  if (attachment.type === 'audio') {
+    return (
+      <div className="mt-2">
+        <audio
+          src={attachment.dataUrl}
+          controls
+          className="max-w-xs"
+          aria-label={`Audio: ${attachment.name}`}
+        />
+        <div className="text-xs text-muted mt-1">{attachment.name}</div>
+      </div>
+    );
+  }
+  
+  return null;
+};
+
 const UserMessageCard = ({ 
   message, 
   showIndicator = false,
   onEdit
 }: { 
-  message: { type: "user_prompt"; prompt: string }; 
+  message: { type: "user_prompt"; prompt: string; attachments?: Attachment[] }; 
   showIndicator?: boolean;
   onEdit?: (newPrompt: string) => void;
 }) => {
@@ -504,6 +552,14 @@ const UserMessageCard = ({
       ) : (
         <>
           <MDContent text={message.prompt} />
+          {/* Display attachments */}
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {message.attachments.map((attachment) => (
+                <AttachmentDisplay key={attachment.id} attachment={attachment} />
+              ))}
+            </div>
+          )}
           <div className="mt-2 flex items-center gap-2 self-start">
             {onEdit && (
               <button

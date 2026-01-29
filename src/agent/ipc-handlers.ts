@@ -330,8 +330,9 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
     // Subscribe this window to the session
     sessionManager.setWindowSession(windowId, session.id);
 
-    // If prompt is empty, just create session without running AI
-    if (!event.payload.prompt || event.payload.prompt.trim() === '') {
+    // If prompt is empty and no attachments, just create session without running AI
+    const hasAttachments = event.payload.attachments && event.payload.attachments.length > 0;
+    if ((!event.payload.prompt || event.payload.prompt.trim() === '') && !hasAttachments) {
       sessions.updateSession(session.id, {
         status: "idle",
         lastPrompt: ""
@@ -343,7 +344,7 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       return;
     }
 
-    // Normal flow with prompt
+    // Normal flow with prompt or attachments
     sessions.updateSession(session.id, {
       status: "running",
       lastPrompt: event.payload.prompt
@@ -366,7 +367,8 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       onEvent: emit,
       onSessionUpdate: (updates) => {
         sessions.updateSession(session.id, updates);
-      }
+      },
+      attachments: event.payload.attachments
     })
       .then((handle) => {
         runnerHandles.set(session.id, handle);
@@ -460,7 +462,8 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       onEvent: emit,
       onSessionUpdate: (updates) => {
         sessions.updateSession(session.id, updates);
-      }
+      },
+      attachments: event.payload.attachments
     })
       .then((handle) => {
         runnerHandles.set(session.id, handle);

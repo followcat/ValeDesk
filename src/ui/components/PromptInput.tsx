@@ -1,11 +1,36 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { ClientEvent } from "../types";
+import type { ClientEvent, Attachment, AttachmentType } from "../types";
 import { useAppStore } from "../store/useAppStore";
 
 const DEFAULT_ALLOWED_TOOLS = "Read,Edit,Bash";
 const MAX_ROWS = 12;
 const LINE_HEIGHT = 21;
 const MAX_HEIGHT = MAX_ROWS * LINE_HEIGHT;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB max file size
+
+// Supported file types
+const SUPPORTED_TYPES: Record<AttachmentType, string[]> = {
+  image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/heic', 'image/heif', 'image/tiff', 'image/avif'],
+  video: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
+  audio: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/flac']
+};
+
+const ACCEPT_STRING = [
+  ...SUPPORTED_TYPES.image,
+  ...SUPPORTED_TYPES.video,
+  ...SUPPORTED_TYPES.audio
+].join(',');
+
+function getAttachmentType(mimeType: string): AttachmentType | null {
+  if (SUPPORTED_TYPES.image.includes(mimeType)) return 'image';
+  if (SUPPORTED_TYPES.video.includes(mimeType)) return 'video';
+  if (SUPPORTED_TYPES.audio.includes(mimeType)) return 'audio';
+  return null;
+}
+
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
 
 interface PromptInputProps {
   sendEvent: (event: ClientEvent) => void;
@@ -22,6 +47,8 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
   const selectedModel = useAppStore((state) => state.selectedModel);
   const selectedTemperature = useAppStore((state) => state.selectedTemperature);
   const sendTemperature = useAppStore((state) => state.sendTemperature);
+  const attachments = useAppStore((state) => state.attachments);
+  const clearAttachments = useAppStore((state) => state.clearAttachments);
 
   const activeSession = activeSessionId ? sessions[activeSessionId] : undefined;
   const isRunning = activeSession?.status === "running";
@@ -29,8 +56,8 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
   const handleSend = useCallback(async () => {
     const trimmedPrompt = prompt.trim();
 
-    // For existing sessions, require a prompt
-    if (activeSessionId && !trimmedPrompt) return;
+    // For existing sessions, require a prompt or attachments
+    if (activeSessionId && !trimmedPrompt && attachments.length === 0) return;
 
     if (!activeSessionId) {
       // Starting new session - can be empty for chat-only mode
@@ -41,6 +68,8 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
       if (trimmedPrompt) {
         const words = trimmedPrompt.split(/\s+/).slice(0, 3);
         title = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+      } else if (attachments.length > 0) {
+        title = `Attachment: ${attachments[0].name}`;
       }
       sendEvent({
         type: "session.start",
@@ -50,7 +79,8 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
           cwd: cwd.trim() || undefined,
           allowedTools: DEFAULT_ALLOWED_TOOLS,
           model: selectedModel || undefined,
-          temperature: sendTemperature ? selectedTemperature : undefined
+          temperature: sendTemperature ? selectedTemperature : undefined,
+          attachments: attachments.length > 0 ? attachments : undefined
         }
       });
       // Save selected model as default for future sessions
@@ -73,10 +103,18 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
         setGlobalError("Session is still running. Please wait for it to finish.");
         return;
       }
-      sendEvent({ type: "session.continue", payload: { sessionId: activeSessionId, prompt: trimmedPrompt } });
+      sendEvent({
+        type: "session.continue",
+        payload: {
+          sessionId: activeSessionId,
+          prompt: trimmedPrompt,
+          attachments: attachments.length > 0 ? attachments : undefined
+        }
+      });
     }
     setPrompt("");
-  }, [activeSession, activeSessionId, cwd, prompt, sendEvent, setGlobalError, setPendingStart, setPrompt, selectedModel, selectedTemperature, sendTemperature]);
+    clearAttachments();
+  }, [activeSession, activeSessionId, cwd, prompt, sendEvent, setGlobalError, setPendingStart, setPrompt, selectedModel, selectedTemperature, sendTemperature, attachments, clearAttachments]);
 
   const handleStop = useCallback(() => {
     if (!activeSessionId) return;
@@ -92,9 +130,143 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
   return { prompt, setPrompt, isRunning, handleSend, handleStop, handleStartFromModal };
 }
 
+/**
+ * Displays a preview thumbnail for an attached file with remove functionality.
+ * Shows thumbnails for images, icons for video/audio, and file info (name, size).
+ */
+function AttachmentPreview({ attachment, onRemove }: { attachment: Attachment; onRemove: () => void }) {
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  return (
+    <div className="relative group flex items-center gap-2 bg-surface-secondary rounded-lg px-2 py-1.5 border border-ink-900/10">
+      {attachment.type === 'image' && (
+        <img
+          src={attachment.dataUrl}
+          alt={attachment.name}
+          className="h-8 w-8 object-cover rounded"
+        />
+      )}
+      {attachment.type === 'video' && (
+        <div className="h-8 w-8 flex items-center justify-center bg-ink-900/10 rounded">
+          <svg className="h-4 w-4 text-ink-600" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </div>
+      )}
+      {attachment.type === 'audio' && (
+        <div className="h-8 w-8 flex items-center justify-center bg-ink-900/10 rounded">
+          <svg className="h-4 w-4 text-ink-600" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+        </div>
+      )}
+      <div className="flex flex-col min-w-0">
+        <span className="text-xs text-ink-700 truncate max-w-[120px]">{attachment.name}</span>
+        <span className="text-xs text-muted">{formatSize(attachment.size)}</span>
+      </div>
+      <button
+        onClick={onRemove}
+        className="absolute -top-1.5 -right-1.5 h-5 w-5 flex items-center justify-center bg-error text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+        aria-label="Remove attachment"
+      >
+        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export function PromptInput({ sendEvent }: PromptInputProps) {
   const { prompt, setPrompt, isRunning, handleSend, handleStop } = usePromptActions(sendEvent);
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  
+  const attachments = useAppStore((state) => state.attachments);
+  const addAttachment = useAppStore((state) => state.addAttachment);
+  const removeAttachment = useAppStore((state) => state.removeAttachment);
+  const setGlobalError = useAppStore((state) => state.setGlobalError);
+
+  // Process file to attachment
+  const processFile = useCallback(async (file: File): Promise<Attachment | null> => {
+    const attachmentType = getAttachmentType(file.type);
+    if (!attachmentType) {
+      setGlobalError(`Unsupported file type: ${file.type}`);
+      return null;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      const maxSizeMB = MAX_FILE_SIZE / (1024 * 1024);
+      setGlobalError(`File too large: ${file.name}. Maximum size is ${maxSizeMB}MB.`);
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        resolve({
+          id: generateId(),
+          type: attachmentType,
+          name: file.name,
+          mimeType: file.type,
+          dataUrl,
+          size: file.size
+        });
+      };
+      reader.onerror = () => {
+        setGlobalError(`Failed to read file: ${file.name}`);
+        resolve(null);
+      };
+      reader.readAsDataURL(file);
+    });
+  }, [setGlobalError]);
+
+  // Handle file selection
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    for (const file of Array.from(files)) {
+      const attachment = await processFile(file);
+      if (attachment) {
+        addAttachment(attachment);
+      }
+    }
+
+    // Reset input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [processFile, addAttachment]);
+
+  // Handle paste event for screenshots
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          const attachment = await processFile(file);
+          if (attachment) {
+            // Give pasted images a meaningful name (create new object to avoid mutation)
+            addAttachment({
+              ...attachment,
+              name: `Screenshot ${new Date().toLocaleTimeString()}`
+            });
+          }
+        }
+        return;
+      }
+    }
+  }, [processFile, addAttachment]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter to send (without Shift)
@@ -137,15 +309,47 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
   return (
     <section className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-surface via-surface to-transparent pb-6 px-2 lg:pb-8 pt-8 lg:ml-[280px]">
       <div className="mx-auto w-full max-w-full">
+        {/* Attachments preview */}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2 px-1">
+            {attachments.map((attachment) => (
+              <AttachmentPreview
+                key={attachment.id}
+                attachment={attachment}
+                onRemove={() => removeAttachment(attachment.id)}
+              />
+            ))}
+          </div>
+        )}
         <div className="flex w-full items-end gap-3 rounded-2xl border border-ink-900/10 bg-surface px-4 py-3 shadow-card">
+          {/* File attachment button */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            accept={ACCEPT_STRING}
+            multiple
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:text-ink-700 hover:bg-surface-secondary transition-colors"
+            aria-label="Attach file"
+            title="Attach image, video, or audio"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+          </button>
           <textarea
             rows={1}
             className="flex-1 resize-none bg-transparent py-1.5 text-sm text-ink-800 placeholder:text-muted focus:outline-none"
-            placeholder="Describe what you want agent to handle..."
+            placeholder={attachments.length > 0 ? "Add a message to your attachments..." : "Describe what you want agent to handle..."}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
+            onPaste={handlePaste}
             ref={promptRef}
           />
           <button
@@ -161,7 +365,7 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
           </button>
         </div>
         <div className="mt-2 px-2 text-xs text-muted text-center">
-          Press <span className="font-medium text-ink-700">Enter</span> to send • <span className="font-medium text-ink-700">Shift + Enter</span> for new line
+          Press <span className="font-medium text-ink-700">Enter</span> to send • <span className="font-medium text-ink-700">Shift + Enter</span> for new line • Paste to add screenshot
         </div>
       </div>
     </section>
