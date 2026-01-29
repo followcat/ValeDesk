@@ -531,6 +531,17 @@ const ImageZoomModal = ({
 /** Renders attached media (image, video, audio) in user messages */
 const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
   const [isZoomed, setIsZoomed] = useState(false);
+
+  const toObjectUrl = (dataUrl: string, fallbackMimeType: string) => {
+    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return null;
+    const mime = match[1] || fallbackMimeType;
+    const base64 = match[2];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: mime }));
+  };
   
   if (attachment.type === 'image') {
     return (
@@ -557,7 +568,21 @@ const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
   
   if (attachment.type === 'video') {
     const [videoError, setVideoError] = useState<string | null>(null);
-    
+    const [objectUrl, setObjectUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+      try {
+        const url = toObjectUrl(attachment.dataUrl, attachment.mimeType || 'video/mp4');
+        setObjectUrl(url);
+        return () => {
+          if (url) URL.revokeObjectURL(url);
+        };
+      } catch {
+        setObjectUrl(null);
+        return;
+      }
+    }, [attachment.dataUrl, attachment.mimeType]);
+
     return (
       <div className="mt-2">
         {videoError ? (
@@ -568,7 +593,7 @@ const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
           </div>
         ) : (
           <video
-            src={attachment.dataUrl}
+            src={objectUrl || attachment.dataUrl}
             controls
             className="max-w-xs max-h-48 rounded-lg"
             aria-label={`Video: ${attachment.name}`}
@@ -607,7 +632,21 @@ const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
   
   if (attachment.type === 'audio') {
     const [audioError, setAudioError] = useState<string | null>(null);
-    
+    const [objectUrl, setObjectUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+      try {
+        const url = toObjectUrl(attachment.dataUrl, attachment.mimeType || 'audio/mpeg');
+        setObjectUrl(url);
+        return () => {
+          if (url) URL.revokeObjectURL(url);
+        };
+      } catch {
+        setObjectUrl(null);
+        return;
+      }
+    }, [attachment.dataUrl, attachment.mimeType]);
+
     return (
       <div className="mt-2">
         {audioError ? (
@@ -618,7 +657,7 @@ const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
           </div>
         ) : (
           <audio
-            src={attachment.dataUrl}
+            src={objectUrl || attachment.dataUrl}
             controls
             className="max-w-xs"
             aria-label={`Audio: ${attachment.name}`}
