@@ -36,6 +36,10 @@ export * from "./execute-python-tool.js";
 // ReadDocument tool (PDF + DOCX)
 export * from "./read-document-tool.js";
 
+// Multimodal tools (Audio transcription + Image generation)
+export * from "./transcribe-audio-tool.js";
+export * from "./image-generation-tool.js";
+
 // ManageTodos tool (Task planning)
 export * from "./manage-todos-tool.js";
 
@@ -70,6 +74,8 @@ import { ALL_FETCH_TOOL_DEFINITIONS } from "./fetch-tool.js";
 import { ALL_BROWSER_TOOL_DEFINITIONS } from "./browser-tool.js";
 import { ALL_SEARCH_TOOL_DEFINITIONS } from "./duckduckgo-search-tool.js";
 import { SkillsToolDefinition } from "./skills-tool.js";
+import { transcribeAudioDefinition } from "./transcribe-audio-tool.js";
+import { generateImageDefinition } from "./image-generation-tool.js";
 
 const electronOnlyToolDefinitions: any[] = [];
 
@@ -96,4 +102,6 @@ export const ALL_TOOL_DEFINITIONS = [
   ...ALL_BROWSER_TOOL_DEFINITIONS,
   ...ALL_SEARCH_TOOL_DEFINITIONS,
   SkillsToolDefinition,
+  transcribeAudioDefinition,
+  generateImageDefinition,
 ];

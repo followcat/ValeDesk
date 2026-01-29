@@ -24,6 +24,8 @@ import { executePythonTool } from "./tools/execute-python-tool.js";
 import { executeReadDocumentTool } from "./tools/read-document-tool.js";
 import { executeManageTodosTool } from "./tools/manage-todos-tool.js";
 import { ScheduleTaskTool, SchedulerIPCCallback } from "./tools/schedule-task-tool.js";
+import { transcribeAudio } from "./tools/transcribe-audio-tool.js";
+import { generateImage } from "./tools/image-generation-tool.js";
 import {
   executeGitStatusTool,
   executeGitLogTool,
@@ -432,6 +434,21 @@ export class ToolExecutor {
         // Skills tool
         case "load_skill":
           return await this.skillsTool.execute(args as any, context);
+
+        // Multimodal tools
+        case "transcribe_audio":
+          return await transcribeAudio(args as any, {
+            cwd: context.cwd,
+            apiKey: this.settings?.apiKey || '',
+            baseUrl: this.settings?.baseUrl
+          });
+
+        case "generate_image":
+          return await generateImage(args as any, {
+            cwd: context.cwd,
+            apiKey: this.settings?.apiKey || '',
+            baseUrl: this.settings?.baseUrl
+          });
 
         default:
           return {
