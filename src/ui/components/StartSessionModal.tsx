@@ -268,7 +268,7 @@ export function StartSessionModal({
             <div className="flex gap-2">
               <input
                 className="flex-1 rounded-xl border border-ink-900/10 bg-surface-secondary px-4 py-2.5 text-sm text-ink-800 placeholder:text-muted-light focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20 transition-colors"
-                placeholder="Leave empty to chat without file access"
+                placeholder="Leave empty to use default conversation directory"
                 value={cwd}
                 onChange={(e) => onCwdChange(e.target.value)}
               />
