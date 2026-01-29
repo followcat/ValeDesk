@@ -20,6 +20,11 @@ uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
 regex = "1"
 
+# Clipboard image support for screenshot paste in Tauri WebView
+arboard = "3"
+base64 = "0.22"
+png = "0.17"
+
 # Code Sandbox - pure Rust interpreters (no external deps needed)
 boa_engine = "0.21"           # JavaScript engine
 # Note: rustpython has sqlite3 conflict with rusqlite, using subprocess for Python
