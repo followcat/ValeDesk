@@ -11,6 +11,7 @@ import type { PermissionRequest } from "../store/useAppStore";
 import MDContent from "../render/markdown";
 import { DecisionPanel } from "./DecisionPanel";
 import { ChangedFiles, type ChangedFile } from "./ChangedFiles";
+import * as Dialog from "@radix-ui/react-dialog";
 
 type MessageContent = SDKAssistantMessage["message"]["content"][number];
 type ToolResultContent = SDKUserMessage["message"]["content"][number];
@@ -436,19 +437,70 @@ const SystemInfoCard = ({ message, showIndicator = false }: { message: SDKMessag
   );
 };
 
+// Image zoom modal component
+const ImageZoomModal = ({ 
+  isOpen, 
+  onClose, 
+  imageUrl, 
+  imageName 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  imageUrl: string; 
+  imageName: string;
+}) => {
+  return (
+    <Dialog.Root open={isOpen} onOpenChange={onClose}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/80 z-50 animate-in fade-in" />
+        <Dialog.Content className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="relative max-w-[90vw] max-h-[90vh] flex flex-col">
+            <Dialog.Close className="absolute top-2 right-2 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors z-10">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </Dialog.Close>
+            <img
+              src={imageUrl}
+              alt={imageName}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg"
+              onClick={onClose}
+            />
+            <div className="mt-2 text-center text-sm text-white/80 bg-black/50 px-4 py-2 rounded">
+              {imageName}
+            </div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+};
+
 // Attachment preview for displaying attached files in user messages
 /** Renders attached media (image, video, audio) in user messages */
 const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
+  const [isZoomed, setIsZoomed] = useState(false);
+  
   if (attachment.type === 'image') {
     return (
-      <div className="mt-2">
-        <img
-          src={attachment.dataUrl}
-          alt={`Attached image: ${attachment.name}`}
-          className="max-w-xs max-h-48 rounded-lg object-contain"
+      <>
+        <div className="mt-2">
+          <img
+            src={attachment.dataUrl}
+            alt={`Attached image: ${attachment.name}`}
+            className="max-w-xs max-h-48 rounded-lg object-contain cursor-zoom-in hover:opacity-90 transition-opacity"
+            onDoubleClick={() => setIsZoomed(true)}
+            title="Double-click to zoom"
+          />
+          <div className="text-xs text-muted mt-1">{attachment.name}</div>
+        </div>
+        <ImageZoomModal
+          isOpen={isZoomed}
+          onClose={() => setIsZoomed(false)}
+          imageUrl={attachment.dataUrl}
+          imageName={attachment.name}
         />
-        <div className="text-xs text-muted mt-1">{attachment.name}</div>
-      </div>
+      </>
     );
   }
   
