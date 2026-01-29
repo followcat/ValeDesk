@@ -245,26 +245,61 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
   }, [processFile, addAttachment]);
 
   // Handle paste event for screenshots
-  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    // Try two approaches: first the direct clipboard items (file-based pastes), 
+    // then the modern Clipboard API (for Tauri/system screenshots)
     const items = e.clipboardData?.items;
-    if (!items) return;
-
-    for (const item of Array.from(items)) {
-      if (item.type.startsWith('image/')) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        if (file) {
-          const attachment = await processFile(file);
-          if (attachment) {
-            // Give pasted images a meaningful name (create new object to avoid mutation)
-            addAttachment({
-              ...attachment,
-              name: `Screenshot ${new Date().toLocaleTimeString()}`
+    
+    if (items && items.length > 0) {
+      // Path 1: Direct clipboard items (file-based pastes, copy from image editors)
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            processFile(file).then((attachment) => {
+              if (attachment) {
+                // Give pasted images a meaningful name
+                addAttachment({
+                  ...attachment,
+                  name: `Screenshot ${new Date().toLocaleTimeString()}`
+                });
+              }
             });
+            return;
           }
         }
-        return;
       }
+    }
+    
+    // Path 2: Use modern Clipboard API (for Tauri/system screenshots)
+    // This is required because Tauri WebView doesn't always expose clipboardData.items
+    // for system clipboard operations (like Cmd+Shift+4 or Win+Shift+S screenshots)
+    if (navigator.clipboard?.read) {
+      e.preventDefault();
+      
+      navigator.clipboard.read()
+        .then(async (clipboardItems) => {
+          for (const item of clipboardItems) {
+            const imageType = item.types.find(type => type.startsWith('image/'));
+            if (imageType) {
+              const blob = await item.getType(imageType);
+              const file = new File([blob], `screenshot-${Date.now()}`, { type: imageType });
+              const attachment = await processFile(file);
+              if (attachment) {
+                addAttachment({
+                  ...attachment,
+                  name: `Screenshot ${new Date().toLocaleTimeString()}`
+                });
+              }
+              return;
+            }
+          }
+        })
+        .catch((error) => {
+          // Silently fail - user can use file upload button instead
+          console.warn('[PromptInput] Clipboard read failed:', error);
+        });
     }
   }, [processFile, addAttachment]);
 
