@@ -477,7 +477,17 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
 
                 for (const attachment of promptAttachments) {
                   if (attachment.type === 'image') {
+                    // Save image to disk for tool access
+                    const savedPath = currentCwd ? saveAttachmentToDisk(attachment, currentCwd) : null;
+                    
                     content.push({ type: 'image_url', image_url: { url: attachment.dataUrl } });
+                    
+                    if (savedPath) {
+                      content.push({ 
+                        type: 'text', 
+                        text: `[Image saved to: ${savedPath}]\nUse this path if you need to edit or process the image with tools.` 
+                      });
+                    }
                   } else if (attachment.type === 'video' || attachment.type === 'audio') {
                     // For historical attachments, try to save to disk
                     const savedPath = currentCwd ? saveAttachmentToDisk(attachment, currentCwd) : null;
@@ -582,13 +592,25 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
             content.push({ type: 'text', text: formattedPrompt });
           }
           
-          // Add attachments (currently only images are supported by most APIs)
+          // Add attachments - save all to disk for tool access
           for (const attachment of attachments) {
             if (attachment.type === 'image') {
+              // Save image to disk so tools like generate_image can access it
+              const savedPath = currentCwd ? saveAttachmentToDisk(attachment, currentCwd) : null;
+              
+              // Add image as data URL for visual understanding
               content.push({
                 type: 'image_url',
                 image_url: { url: attachment.dataUrl }
               });
+              
+              // Also add file path info so LLM can use it with tools
+              if (savedPath) {
+                content.push({
+                  type: 'text',
+                  text: `[Image saved to: ${savedPath}]\nUse this path if you need to edit or process the image with tools.`
+                });
+              }
             } else if (attachment.type === 'video' || attachment.type === 'audio') {
               // For video/audio, save to disk first so LLM can access them
               const savedPath = currentCwd ? saveAttachmentToDisk(attachment, currentCwd) : null;
