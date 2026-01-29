@@ -19,6 +19,7 @@ import { isGitRepo, getRelativePath, getFileDiffStats } from "../git-utils.js";
 import { join } from "path";
 import { homedir } from "os";
 import type { Attachment } from "../types.js";
+import { executionLogger } from "./execution-logger.js";
 
 export type RunnerOptions = {
   prompt: string;
@@ -95,6 +96,9 @@ const redactMessagesForLog = (messages: ChatMessage[]) => {
 
 export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
   const { prompt, session, onEvent, onSessionUpdate, attachments } = options;
+
+  // Initialize execution logger for this session
+  executionLogger.setSession(session.id);
 
   // Debug: log attachments received
   console.log(`[runner] attachments received:`, attachments?.length ?? 0, attachments?.map(a => ({ type: a.type, name: a.name, size: a.dataUrl?.length })) ?? []);
@@ -639,7 +643,26 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         }
         messages[0] = { role: 'system', content: updatedSystemContent };
         
+        const iterationStartTime = Date.now();
         console.log(`[runner] iteration ${iterationCount}`);
+        
+        // Log iteration start
+        executionLogger.logIteration({
+          iteration: iterationCount,
+          action: 'start',
+          totalInputTokens,
+          totalOutputTokens,
+          elapsedMs: Date.now() - sessionStartTime
+        });
+
+        // Log LLM request
+        executionLogger.logLLMRequest({
+          model: modelName,
+          messageCount: messages.length,
+          toolCount: activeTools.length,
+          hasAttachments: messages.some(m => Array.isArray(m.content) && 
+            m.content.some((c: any) => c.type === 'image_url'))
+        });
 
         // Log request to file
         const requestPayload = {
@@ -1045,6 +1068,14 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
             // Send permission request and wait for user approval
             sendPermissionRequest(toolUseId, toolName, toolArgs, toolArgs.explanation);
             
+            // Log permission request
+            executionLogger.logToolExecution({
+              toolName,
+              toolUseId,
+              input: toolArgs,
+              status: 'permission_required'
+            });
+            
             // Wait for permission result from UI with abort check
             const approved = await new Promise<boolean>((resolve) => {
               pendingPermissions.set(toolUseId, { resolve });
@@ -1071,6 +1102,16 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
             
             if (!approved) {
               console.log(`[tool] ✗ ${toolName} denied`);
+              
+              // Log permission denied
+              executionLogger.logToolExecution({
+                toolName,
+                toolUseId,
+                input: toolArgs,
+                status: 'error',
+                error: 'Permission denied by user',
+                durationMs: Date.now() - toolStartTime
+              });
               
               // Add error result for denied tool
               toolResults.push({
@@ -1099,6 +1140,18 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
                 payload: { sessionId: session.id, todos }
               });
             }
+          });
+          
+          // Log successful execution
+          executionLogger.logToolExecution({
+            toolName,
+            toolUseId,
+            input: toolArgs,
+            status: 'success',
+            result: typeof result === 'string' && result.length > 500 
+              ? `${result.substring(0, 500)}... (truncated)` 
+              : result,
+            durationMs: Date.now() - toolStartTime
           });
 
           if (toolName === 'attach_image' && result.success && result.data && (result.data as any).dataUrl) {
