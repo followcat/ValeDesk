@@ -21,6 +21,33 @@ import { homedir } from "os";
 import type { Attachment } from "../types.js";
 import { executionLogger } from "./execution-logger.js";
 
+// Helper function to save attachment to disk
+function saveAttachmentToDisk(attachment: Attachment, cwd: string): string | null {
+  if (!cwd) return null;
+  
+  try {
+    // Decode base64 data URL
+    const matches = attachment.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!matches) {
+      console.error(`[saveAttachment] Invalid data URL format for ${attachment.name}`);
+      return null;
+    }
+    
+    const base64Data = matches[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    // Save to workspace directory
+    const filePath = join(cwd, attachment.name);
+    writeFileSync(filePath, buffer);
+    
+    console.log(`[saveAttachment] Saved ${attachment.name} to ${filePath} (${buffer.length} bytes)`);
+    return filePath;
+  } catch (error) {
+    console.error(`[saveAttachment] Failed to save ${attachment.name}:`, error);
+    return null;
+  }
+}
+
 export type RunnerOptions = {
   prompt: string;
   session: Session;
@@ -452,7 +479,20 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
                   if (attachment.type === 'image') {
                     content.push({ type: 'image_url', image_url: { url: attachment.dataUrl } });
                   } else if (attachment.type === 'video' || attachment.type === 'audio') {
-                    content.push({ type: 'text', text: `[Attached ${attachment.type}: ${attachment.name}]` });
+                    // For historical attachments, try to save to disk
+                    const savedPath = currentCwd ? saveAttachmentToDisk(attachment, currentCwd) : null;
+                    
+                    if (savedPath) {
+                      content.push({ 
+                        type: 'text', 
+                        text: `[Attached ${attachment.type} file: ${attachment.name}]\nSaved to: ${savedPath}` 
+                      });
+                    } else {
+                      content.push({ 
+                        type: 'text', 
+                        text: `[Attached ${attachment.type}: ${attachment.name}]` 
+                      });
+                    }
                   }
                 }
 
@@ -550,12 +590,22 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
                 image_url: { url: attachment.dataUrl }
               });
             } else if (attachment.type === 'video' || attachment.type === 'audio') {
-              // For video/audio, add as text description since not all APIs support them natively
-              // The file is still attached and can be referenced, but won't be processed as media
-              content.push({
-                type: 'text',
-                text: `[Attached ${attachment.type}: ${attachment.name}]`
-              });
+              // For video/audio, save to disk first so LLM can access them
+              const savedPath = currentCwd ? saveAttachmentToDisk(attachment, currentCwd) : null;
+              
+              if (savedPath) {
+                // File saved successfully - tell LLM about it
+                content.push({
+                  type: 'text',
+                  text: `[Attached ${attachment.type} file: ${attachment.name}]\nThe file has been saved to: ${savedPath}\nYou can now access it using bash, ffmpeg, or other tools.`
+                });
+              } else {
+                // Failed to save or no workspace
+                content.push({
+                  type: 'text',
+                  text: `[Attached ${attachment.type}: ${attachment.name}]\n⚠️ File could not be saved to workspace. ${currentCwd ? 'Save failed.' : 'No workspace directory configured.'}`
+                });
+              }
             }
           }
           
