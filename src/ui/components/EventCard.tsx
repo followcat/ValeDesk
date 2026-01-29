@@ -505,30 +505,99 @@ const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
   }
   
   if (attachment.type === 'video') {
+    const [videoError, setVideoError] = useState<string | null>(null);
+    
     return (
       <div className="mt-2">
-        <video
-          src={attachment.dataUrl}
-          controls
-          className="max-w-xs max-h-48 rounded-lg"
-          aria-label={`Video: ${attachment.name}`}
-        >
-          <track kind="captions" />
-        </video>
+        {videoError ? (
+          <div className="max-w-xs p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="text-sm text-red-700 mb-1">Failed to load video</div>
+            <div className="text-xs text-red-600">{attachment.name}</div>
+            <div className="text-xs text-red-500 mt-1">{videoError}</div>
+          </div>
+        ) : (
+          <video
+            src={attachment.dataUrl}
+            controls
+            className="max-w-xs max-h-48 rounded-lg"
+            aria-label={`Video: ${attachment.name}`}
+            onError={(e) => {
+              const target = e.target as HTMLVideoElement;
+              const error = target.error;
+              let errorMsg = 'Unknown error';
+              if (error) {
+                switch (error.code) {
+                  case MediaError.MEDIA_ERR_ABORTED:
+                    errorMsg = 'Playback aborted';
+                    break;
+                  case MediaError.MEDIA_ERR_NETWORK:
+                    errorMsg = 'Network error';
+                    break;
+                  case MediaError.MEDIA_ERR_DECODE:
+                    errorMsg = 'Decoding error - unsupported format';
+                    break;
+                  case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                    errorMsg = 'Video format not supported by browser';
+                    break;
+                }
+              }
+              console.error('[VideoAttachment] Failed to load:', attachment.name, errorMsg);
+              setVideoError(errorMsg);
+            }}
+          >
+            <track kind="captions" />
+            Your browser does not support the video element.
+          </video>
+        )}
         <div className="text-xs text-muted mt-1">{attachment.name}</div>
       </div>
     );
   }
   
   if (attachment.type === 'audio') {
+    const [audioError, setAudioError] = useState<string | null>(null);
+    
     return (
       <div className="mt-2">
-        <audio
-          src={attachment.dataUrl}
-          controls
-          className="max-w-xs"
-          aria-label={`Audio: ${attachment.name}`}
-        />
+        {audioError ? (
+          <div className="max-w-xs p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="text-sm text-red-700 mb-1">Failed to load audio</div>
+            <div className="text-xs text-red-600">{attachment.name}</div>
+            <div className="text-xs text-red-500 mt-1">{audioError}</div>
+          </div>
+        ) : (
+          <audio
+            src={attachment.dataUrl}
+            controls
+            className="max-w-xs"
+            aria-label={`Audio: ${attachment.name}`}
+            onError={(e) => {
+              const target = e.target as HTMLAudioElement;
+              const error = target.error;
+              let errorMsg = 'Unknown error';
+              if (error) {
+                switch (error.code) {
+                  case MediaError.MEDIA_ERR_ABORTED:
+                    errorMsg = 'Playback aborted';
+                    break;
+                  case MediaError.MEDIA_ERR_NETWORK:
+                    errorMsg = 'Network error';
+                    break;
+                  case MediaError.MEDIA_ERR_DECODE:
+                    errorMsg = 'Decoding error - unsupported format';
+                    break;
+                  case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                    errorMsg = 'Audio format not supported by browser';
+                    break;
+                }
+              }
+              console.error('[AudioAttachment] Failed to load:', attachment.name, errorMsg);
+              setAudioError(errorMsg);
+            }}
+          >
+            Your browser does not support the audio element.
+          </audio>
+        )}
         <div className="text-xs text-muted mt-1">{attachment.name}</div>
       </div>
     );
