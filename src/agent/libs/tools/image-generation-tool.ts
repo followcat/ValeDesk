@@ -87,6 +87,8 @@ export async function generateImage(
     } = args;
     const { cwd, apiKey, baseUrl } = context;
 
+    console.log(`[generate_image] Using baseUrl=${baseUrl || '<default>'}`);
+
     // Initialize OpenAI client
     const client = new OpenAI({
       apiKey,

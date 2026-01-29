@@ -78,6 +78,8 @@ export async function transcribeAudio(
       };
     }
 
+    console.log(`[transcribe_audio] Using baseUrl=${baseUrl || '<default>'}`);
+
     // Initialize OpenAI client
     const client = new OpenAI({
       apiKey,
