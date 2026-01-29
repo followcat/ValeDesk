@@ -1238,6 +1238,8 @@ fn client_event(app: tauri::AppHandle, state: tauri::State<'_, AppState>, event:
             "payload": {
               "sessionId": session_id,
               "prompt": payload.get("prompt").and_then(|v| v.as_str()).unwrap_or(""),
+              // Preserve attachments from original payload
+              "attachments": payload.get("attachments"),
               // Session data for restoration in sidecar
               "sessionData": {
                 "title": history.session.title,
