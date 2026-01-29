@@ -262,9 +262,13 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
           const file = item.getAsFile();
           if (file) {
             e.preventDefault();
-            processFile(file).then((attachment) => {
-              if (attachment) addScreenshotAttachment(attachment);
-            });
+            processFile(file)
+              .then((attachment) => {
+                if (attachment) addScreenshotAttachment(attachment);
+              })
+              .catch((error) => {
+                console.warn('[PromptInput] Failed to process pasted image:', error);
+              });
             return; // Successfully found image in clipboard, exit
           }
         }
@@ -276,18 +280,15 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
     // Path 2: Fallback to Clipboard API for Tauri/system screenshots
     // Required because Tauri WebView may not expose clipboardData.items for system screenshots
     // (like Cmd+Shift+4 on Mac or Win+Shift+S on Windows)
-    // Note: We must call preventDefault() synchronously, but we can only know if there's an image
-    // after the async clipboard.read() call. To avoid breaking text paste, we try reading
-    // the clipboard and only process if an image is found.
+    // Note: When clipboardData.items is empty, we attempt to read from the Clipboard API.
+    // This may result in both text paste (default behavior) and image attachment if clipboard has both.
     if (navigator.clipboard?.read) {
-      // Don't prevent default here - let text paste work normally
-      // The clipboard.read() will fetch the image in parallel
       navigator.clipboard.read()
         .then((clipboardItems) => {
           for (const item of clipboardItems) {
             const imageType = item.types.find(type => type.startsWith('image/'));
             if (imageType) {
-              item.getType(imageType)
+              return item.getType(imageType)
                 .then((blob) => {
                   const file = new File([blob], `screenshot-${Date.now()}`, { type: imageType });
                   return processFile(file);
@@ -295,7 +296,6 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
                 .then((attachment) => {
                   if (attachment) addScreenshotAttachment(attachment);
                 });
-              return; // Found image, stop processing
             }
           }
         })
