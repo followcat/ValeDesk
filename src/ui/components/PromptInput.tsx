@@ -244,55 +244,58 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
     }
   }, [processFile, addAttachment]);
 
+  // Helper to add image attachment with screenshot naming
+  const addScreenshotAttachment = useCallback((attachment: Attachment) => {
+    addAttachment({
+      ...attachment,
+      name: `Screenshot ${new Date().toLocaleTimeString()}`
+    });
+  }, [addAttachment]);
+
   // Handle paste event for screenshots
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    // Try two approaches: first the direct clipboard items (file-based pastes), 
-    // then the modern Clipboard API (for Tauri/system screenshots)
+    // Path 1: Try direct clipboard items (works for most browsers and file-based pastes)
     const items = e.clipboardData?.items;
-    
     if (items && items.length > 0) {
-      // Path 1: Direct clipboard items (file-based pastes, copy from image editors)
       for (const item of Array.from(items)) {
         if (item.type.startsWith('image/')) {
-          e.preventDefault();
           const file = item.getAsFile();
           if (file) {
+            e.preventDefault();
             processFile(file).then((attachment) => {
-              if (attachment) {
-                // Give pasted images a meaningful name
-                addAttachment({
-                  ...attachment,
-                  name: `Screenshot ${new Date().toLocaleTimeString()}`
-                });
-              }
+              if (attachment) addScreenshotAttachment(attachment);
             });
-            return;
+            return; // Successfully found image in clipboard, exit
           }
         }
       }
+      // Items exist but no images found, allow default paste behavior (text)
+      return;
     }
     
-    // Path 2: Use modern Clipboard API (for Tauri/system screenshots)
-    // This is required because Tauri WebView doesn't always expose clipboardData.items
-    // for system clipboard operations (like Cmd+Shift+4 or Win+Shift+S screenshots)
+    // Path 2: Fallback to Clipboard API for Tauri/system screenshots
+    // Required because Tauri WebView may not expose clipboardData.items for system screenshots
+    // (like Cmd+Shift+4 on Mac or Win+Shift+S on Windows)
+    // Note: We must call preventDefault() synchronously, but we can only know if there's an image
+    // after the async clipboard.read() call. To avoid breaking text paste, we try reading
+    // the clipboard and only process if an image is found.
     if (navigator.clipboard?.read) {
-      e.preventDefault();
-      
+      // Don't prevent default here - let text paste work normally
+      // The clipboard.read() will fetch the image in parallel
       navigator.clipboard.read()
-        .then(async (clipboardItems) => {
+        .then((clipboardItems) => {
           for (const item of clipboardItems) {
             const imageType = item.types.find(type => type.startsWith('image/'));
             if (imageType) {
-              const blob = await item.getType(imageType);
-              const file = new File([blob], `screenshot-${Date.now()}`, { type: imageType });
-              const attachment = await processFile(file);
-              if (attachment) {
-                addAttachment({
-                  ...attachment,
-                  name: `Screenshot ${new Date().toLocaleTimeString()}`
+              item.getType(imageType)
+                .then((blob) => {
+                  const file = new File([blob], `screenshot-${Date.now()}`, { type: imageType });
+                  return processFile(file);
+                })
+                .then((attachment) => {
+                  if (attachment) addScreenshotAttachment(attachment);
                 });
-              }
-              return;
+              return; // Found image, stop processing
             }
           }
         })
@@ -301,7 +304,7 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
           console.warn('[PromptInput] Clipboard read failed:', error);
         });
     }
-  }, [processFile, addAttachment]);
+  }, [processFile, addScreenshotAttachment]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter to send (without Shift)
