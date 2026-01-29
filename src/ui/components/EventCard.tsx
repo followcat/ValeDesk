@@ -9,6 +9,7 @@ import type {
 import type { StreamMessage, Attachment, FileChange } from "../types";
 import type { PermissionRequest } from "../store/useAppStore";
 import MDContent from "../render/markdown";
+import { getPlatform } from "../platform";
 import { DecisionPanel } from "./DecisionPanel";
 import { ChangedFiles, type ChangedFile } from "./ChangedFiles";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -164,6 +165,28 @@ const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) =
   const status: ToolStatus = messageContent.is_error ? "error" : "success";
   const isError = messageContent.is_error;
 
+  const extractFilePaths = (text: string): string[] => {
+    const paths = new Set<string>();
+    const lines = String(text ?? "").split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const markers = ["Saved to:", "Output file:", "输出文件：", "输出文件:"];
+      const marker = markers.find((m) => trimmed.includes(m));
+      if (marker) {
+        const idx = trimmed.indexOf(marker);
+        const candidate = trimmed.slice(idx + marker.length).trim();
+        if (candidate.startsWith("/")) paths.add(candidate);
+        continue;
+      }
+
+      // Fallback: a line that looks like an absolute path
+      if (trimmed.startsWith("/") && /\.[a-zA-Z0-9]{1,8}$/.test(trimmed)) {
+        paths.add(trimmed);
+      }
+    }
+    return Array.from(paths);
+  };
+
   if (messageContent.is_error) {
     lines = [extractTagContent(String(messageContent.content), "tool_use_error") || String(messageContent.content)];
   } else {
@@ -179,6 +202,7 @@ const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) =
   const isMarkdownContent = isMarkdown(lines.join("\n"));
   const hasMoreLines = lines.length > MAX_VISIBLE_LINES;
   const visibleContent = hasMoreLines && !isExpanded ? lines.slice(0, MAX_VISIBLE_LINES).join("\n") : lines.join("\n");
+  const filePaths = extractFilePaths(lines.join("\n"));
 
   useEffect(() => { setToolStatus(toolUseId, status); }, [toolUseId, status]);
   useEffect(() => {
@@ -198,6 +222,33 @@ const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) =
         <pre className={`text-sm whitespace-pre-wrap break-words font-mono overflow-x-auto ${isError ? "text-red-500" : "text-ink-700"}`}>
           {isMarkdownContent ? <MDContent text={visibleContent} /> : visibleContent}
         </pre>
+        {filePaths.length > 0 && (
+          <div className="mt-3 flex flex-col gap-2">
+            {filePaths.map((path) => (
+              <div key={path} className="flex items-center justify-between gap-2 rounded-lg bg-surface px-3 py-2 border border-ink-900/10">
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs text-muted">File</div>
+                  <div className="text-xs font-mono text-ink-700 truncate" title={path}>{path}</div>
+                </div>
+                <div className="shrink-0 flex items-center gap-2">
+                  <button
+                    className="rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover transition-colors"
+                    onClick={() => getPlatform().send('open-file', path)}
+                  >
+                    Preview
+                  </button>
+                  <button
+                    className="rounded-full border border-ink-900/10 bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-tertiary transition-colors"
+                    onClick={() => getPlatform().invoke('open-path-in-finder', path)}
+                    title="Show in folder"
+                  >
+                    Save As
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {hasMoreLines && (
           <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-sm text-accent hover:text-accent-hover transition-colors flex items-center gap-1">
             <span>{isExpanded ? "▲" : "▼"}</span>
