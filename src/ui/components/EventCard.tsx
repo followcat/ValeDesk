@@ -535,7 +535,10 @@ const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
   const toObjectUrl = (dataUrl: string, fallbackMimeType: string) => {
     const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
     if (!match) return null;
-    const mime = match[1] || fallbackMimeType;
+    const rawMime = match[1];
+    const mime = (!rawMime || rawMime === 'application/octet-stream')
+      ? fallbackMimeType
+      : (rawMime === 'audio/mp3' ? 'audio/mpeg' : rawMime);
     const base64 = match[2];
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
