@@ -1,5 +1,5 @@
 import readline from "node:readline";
-import type { ClientEvent } from "../ui/types.js";
+import type { ClientEvent, Attachment } from "../ui/types.js";
 import type { ServerEvent } from "../agent/types.js";
 import type { SidecarInboundMessage, SidecarOutboundMessage } from "./protocol.js";
 
@@ -210,7 +210,7 @@ function emitAndPersist(event: ServerEvent) {
   }
 
   if (event.type === "stream.user_prompt") {
-    sessions.recordMessage(event.payload.sessionId, { type: "user_prompt", prompt: event.payload.prompt } as any);
+    sessions.recordMessage(event.payload.sessionId, { type: "user_prompt", prompt: event.payload.prompt, attachments: event.payload.attachments } as any);
   }
 
   emit(event);
@@ -258,7 +258,7 @@ function handleSessionHistory(event: Extract<ClientEvent, { type: "session.histo
   } as any);
 }
 
-function startRunner(sessionId: string, prompt: string) {
+function startRunner(sessionId: string, prompt: string, attachments?: Attachment[]) {
   const session = sessions.getSession(sessionId);
   if (!session) {
     sendRunnerError("Unknown session", sessionId);
@@ -273,6 +273,7 @@ function startRunner(sessionId: string, prompt: string) {
     resumeSessionId: session.claudeSessionId,
     onEvent: emitAndPersist,
     onSessionUpdate: (updates) => sessions.updateSession(session.id, updates),
+    attachments,
   })
     .then((handle) => {
       runnerHandles.set(session.id, handle);
@@ -310,12 +311,12 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
     payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd, model: session.model, temperature: session.temperature },
   } as any);
 
-  emitAndPersist({ type: "stream.user_prompt", payload: { sessionId: session.id, prompt: event.payload.prompt } } as any);
-  startRunner(session.id, event.payload.prompt);
+  emitAndPersist({ type: "stream.user_prompt", payload: { sessionId: session.id, prompt: event.payload.prompt, attachments: event.payload.attachments } } as any);
+  startRunner(session.id, event.payload.prompt, event.payload.attachments);
 }
 
 function handleSessionContinue(event: Extract<ClientEvent, { type: "session.continue" }>) {
-  const { sessionId, prompt, sessionData, messages: historyMessages, todos: historyTodos } = event.payload as any;
+  const { sessionId, prompt, sessionData, messages: historyMessages, todos: historyTodos, attachments } = event.payload as any;
   let session = sessions.getSession(sessionId);
   
   // If session not in memory, try to restore from sessionData (provided by Rust)
@@ -355,8 +356,8 @@ function handleSessionContinue(event: Extract<ClientEvent, { type: "session.cont
     payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd, model: session.model, temperature: session.temperature },
   } as any);
 
-  emitAndPersist({ type: "stream.user_prompt", payload: { sessionId: session.id, prompt } } as any);
-  startRunner(session.id, prompt);
+  emitAndPersist({ type: "stream.user_prompt", payload: { sessionId: session.id, prompt, attachments } } as any);
+  startRunner(session.id, prompt, attachments);
 }
 
 function handleSessionStop(event: Extract<ClientEvent, { type: "session.stop" }>) {

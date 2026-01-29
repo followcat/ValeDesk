@@ -197,7 +197,7 @@ export interface LLMProviderSettings {
 // Server -> Client events
 export type ServerEvent =
   | { type: "stream.message"; payload: { sessionId: string; message: StreamMessage; threadId?: string } }
-  | { type: "stream.user_prompt"; payload: { sessionId: string; prompt: string; threadId?: string } }
+  | { type: "stream.user_prompt"; payload: { sessionId: string; prompt: string; threadId?: string; attachments?: Attachment[] } }
   | { type: "session.status"; payload: { sessionId: string; status: SessionStatus; title?: string; cwd?: string; error?: string; model?: string; temperature?: number; threadId?: string } }
   | { type: "session.list"; payload: { sessions: SessionInfo[] } }
   | { type: "session.history"; payload: { sessionId: string; status: SessionStatus; messages: StreamMessage[]; inputTokens?: number; outputTokens?: number; todos?: TodoItem[]; model?: string; fileChanges?: FileChange[]; hasMore?: boolean; nextCursor?: number; page?: "initial" | "prepend" } }

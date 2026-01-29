@@ -105,7 +105,8 @@ function emit(event: ServerEvent) {
   if (event.type === "stream.user_prompt") {
     sessions.recordMessage(event.payload.sessionId, {
       type: "user_prompt",
-      prompt: event.payload.prompt
+      prompt: event.payload.prompt,
+      attachments: event.payload.attachments
     });
   }
   if (isStreamEventMessage && suppressStreamEvents) {
@@ -357,7 +358,7 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
     // Use emit() to save user_prompt to DB AND send to UI
     emit({
       type: "stream.user_prompt",
-      payload: { sessionId: session.id, prompt: event.payload.prompt }
+      payload: { sessionId: session.id, prompt: event.payload.prompt, attachments: event.payload.attachments }
     });
 
     selectRunner(session.model)({
@@ -451,7 +452,7 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
     if (!isSamePrompt) {
       emit({
         type: "stream.user_prompt",
-        payload: { sessionId: session.id, prompt: event.payload.prompt }
+        payload: { sessionId: session.id, prompt: event.payload.prompt, attachments: event.payload.attachments }
       });
     }
 
