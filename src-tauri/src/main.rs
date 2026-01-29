@@ -748,6 +748,13 @@ fn read_clipboard_image() -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
+fn get_default_conversations_dir() -> Result<String, String> {
+  let app_data = app_data_dir()?;
+  let conversations_dir = app_data.join("Conversations");
+  Ok(conversations_dir.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 fn open_external_url(url: String) -> Result<OpResult, String> {
   if !(url.starts_with("http://") || url.starts_with("https://")) {
     return Ok(OpResult {
@@ -1858,6 +1865,7 @@ fn main() {
       read_memory,
       write_memory,
       read_clipboard_image,
+      get_default_conversations_dir,
       open_external_url,
       open_path_in_finder,
       open_file,

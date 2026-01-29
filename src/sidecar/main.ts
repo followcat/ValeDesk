@@ -292,11 +292,20 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
   let resolvedCwd = event.payload.cwd;
   let forcedSessionId: string | undefined;
 
-  // If no workspace was specified, optionally use the configured conversation data dir.
+  // If no workspace was specified, use the configured conversation data dir (or default).
   if (!resolvedCwd || !resolvedCwd.trim()) {
     try {
       const settings = loadApiSettings() as (ApiSettings & { conversationDataDir?: string }) | null;
-      const baseDir = settings?.conversationDataDir;
+      let baseDir = settings?.conversationDataDir;
+      
+      // If conversationDataDir is empty/unset, use the default: {app_data_dir}/Conversations
+      if (!baseDir || !baseDir.trim()) {
+        const userDataDir = process.env.VALERA_USER_DATA_DIR;
+        if (userDataDir) {
+          baseDir = join(userDataDir, 'Conversations');
+        }
+      }
+      
       if (baseDir && baseDir.trim()) {
         forcedSessionId = crypto.randomUUID();
         resolvedCwd = join(baseDir, forcedSessionId);

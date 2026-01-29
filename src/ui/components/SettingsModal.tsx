@@ -1364,6 +1364,21 @@ function ToolsTab({
   conversationDataDir,
   setConversationDataDir
 }: any) {
+  const [defaultDir, setDefaultDir] = useState<string>("");
+
+  // Load default conversations directory on mount
+  useEffect(() => {
+    const loadDefaultDir = async () => {
+      try {
+        const dir = await window.__TAURI_INVOKE__("get_default_conversations_dir");
+        setDefaultDir(dir);
+      } catch (err) {
+        console.error("[SettingsModal] Failed to get default conversations dir:", err);
+      }
+    };
+    loadDefaultDir();
+  }, []);
+
   return (
     <div className="px-6 py-4 space-y-6">
       <div>
@@ -1371,12 +1386,17 @@ function ToolsTab({
           Conversation Data Directory
           <span className="ml-2 text-xs font-normal text-ink-500">Used when starting a new session without a workspace</span>
         </label>
+        {defaultDir && (
+          <div className="mb-2 text-xs text-ink-500">
+            Leave empty to use default: <code className="bg-ink-100 px-1.5 py-0.5 rounded">{defaultDir}</code>
+          </div>
+        )}
 
         <div className="flex gap-2">
           <input
             value={conversationDataDir || ''}
             onChange={(e) => setConversationDataDir(e.target.value)}
-            placeholder="/path/to/valedesk/conversations"
+            placeholder={defaultDir || "/path/to/conversations"}
             className="flex-1 px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
           />
           <button
