@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { query, type SDKMessage, type PermissionResult } from "@anthropic-ai/claude-agent-sdk";
-import type { ServerEvent } from "../types.js";
+import type { ServerEvent, Attachment } from "../types.js";
 import type { Session } from "./session-store.js";
 import { claudeCodePath, getEnhancedEnv } from "./util.js";
 import { loadApiSettings } from "./settings-store.js";
@@ -23,6 +23,7 @@ export type RunnerOptions = {
   resumeSessionId?: string;
   onEvent: (event: ServerEvent) => void;
   onSessionUpdate?: (updates: Partial<Session>) => void;
+  attachments?: Attachment[];
 };
 
 export type RunnerHandle = {
