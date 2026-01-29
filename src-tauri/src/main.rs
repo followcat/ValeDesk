@@ -17,6 +17,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, Manager};
 
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FileItem {
@@ -710,6 +713,38 @@ fn write_memory(content: String) -> Result<(), String> {
   let path = memory_path()?;
   ensure_parent_dir(&path)?;
   fs::write(&path, content).map_err(|error| format!("[write_memory] Failed to write {}: {error}", path.display()))
+}
+
+#[tauri::command]
+fn read_clipboard_image() -> Result<Option<String>, String> {
+  let mut clipboard = arboard::Clipboard::new().map_err(|error| format!("[clipboard] init failed: {error}"))?;
+
+  let image = match clipboard.get_image() {
+    Ok(img) => img,
+    Err(_) => return Ok(None),
+  };
+
+  // arboard returns raw pixels (commonly BGRA). Convert to RGBA for PNG encoding.
+  let mut rgba = image.bytes.into_owned();
+  for px in rgba.chunks_exact_mut(4) {
+    px.swap(0, 2);
+  }
+
+  let mut png_bytes: Vec<u8> = Vec::new();
+  {
+    let mut encoder = png::Encoder::new(&mut png_bytes, image.width as u32, image.height as u32);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder
+      .write_header()
+      .map_err(|error| format!("[clipboard] png header failed: {error}"))?;
+    writer
+      .write_image_data(&rgba)
+      .map_err(|error| format!("[clipboard] png write failed: {error}"))?;
+  }
+
+  let b64 = BASE64_STANDARD.encode(png_bytes);
+  Ok(Some(format!("data:image/png;base64,{b64}")))
 }
 
 #[tauri::command]
@@ -1820,6 +1855,7 @@ fn main() {
       list_directory,
       read_memory,
       write_memory,
+      read_clipboard_image,
       open_external_url,
       open_path_in_finder,
       open_file,
