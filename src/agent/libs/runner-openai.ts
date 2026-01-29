@@ -95,6 +95,9 @@ const redactMessagesForLog = (messages: ChatMessage[]) => {
 
 export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
   const { prompt, session, onEvent, onSessionUpdate, attachments } = options;
+
+  // Debug: log attachments received
+  console.log(`[runner] attachments received:`, attachments?.length ?? 0, attachments?.map(a => ({ type: a.type, name: a.name, size: a.dataUrl?.length })) ?? []);
   let aborted = false;
   const abortController = new AbortController();
   const MAX_STREAM_RETRIES = 3;
@@ -368,6 +371,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       // Load previous messages from session history
       const sessionStore = (global as any).sessionStore;
       let lastUserPrompt = '';
+      let lastUserPromptHadAttachments = false;
       let isFirstUserPrompt = true;
       
       if (sessionStore && session.id) {
@@ -389,6 +393,8 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           for (const msg of history.messages) {
             if (msg.type === 'user_prompt') {
               const promptText = (msg as any).prompt || '';
+              const promptAttachments = (msg as any).attachments as Attachment[] | undefined;
+              const hasPromptAttachments = Array.isArray(promptAttachments) && promptAttachments.length > 0;
               
               // Flush any pending assistant message with tool calls
               if (currentAssistantText.trim() || currentToolCalls.length > 0) {
@@ -422,17 +428,37 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
               
               // Track last user prompt to avoid duplication
               lastUserPrompt = promptText;
+              lastUserPromptHadAttachments = hasPromptAttachments;
               
               // ALWAYS format user prompts with date (even from history)
               const formattedPromptText = isFirstUserPrompt 
                 ? getInitialPrompt(promptText, memoryContent)
                 : getInitialPrompt(promptText);
               isFirstUserPrompt = false;
-              
-              messages.push({
-                role: 'user',
-                content: formattedPromptText
-              });
+
+              if (hasPromptAttachments) {
+                type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
+                const content: ContentPart[] = [];
+
+                if (formattedPromptText) {
+                  content.push({ type: 'text', text: formattedPromptText });
+                }
+
+                for (const attachment of promptAttachments) {
+                  if (attachment.type === 'image') {
+                    content.push({ type: 'image_url', image_url: { url: attachment.dataUrl } });
+                  } else if (attachment.type === 'video' || attachment.type === 'audio') {
+                    content.push({ type: 'text', text: `[Attached ${attachment.type}: ${attachment.name}]` });
+                  }
+                }
+
+                messages.push({ role: 'user', content });
+              } else {
+                messages.push({
+                  role: 'user',
+                  content: formattedPromptText
+                });
+              }
             } else if (msg.type === 'text') {
               // Accumulate text into assistant message
               currentAssistantText += (msg as any).text || '';
@@ -491,7 +517,9 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       }
 
       // Add current prompt ONLY if it's different from the last one in history
-      if (prompt !== lastUserPrompt) {
+      // (or if attachments exist but the last stored prompt didn't include them)
+      const currentHasAttachments = Array.isArray(attachments) && attachments.length > 0;
+      if (prompt !== lastUserPrompt || (currentHasAttachments && !lastUserPromptHadAttachments)) {
         // Always format prompt with current date for context
         // Add memory only if this is a new session (no history)
         const shouldAddMemory = messages.length === 1; // Only system message exists
@@ -547,6 +575,12 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       // Use initial tools (will be refreshed each iteration)
       let activeTools = initialTools;
       let currentGuiSettings = guiSettings;
+      
+      // Debug: log final messages structure before API call
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg?.role === 'user' && Array.isArray(lastMsg.content)) {
+        console.log(`[runner] user message has ${lastMsg.content.length} content parts:`, lastMsg.content.map((c: any) => c.type));
+      }
       
       console.log(`\n[runner] → ${modelName} | ${activeTools.length} tools | ${messages.length} msgs`);
 
