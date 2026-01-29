@@ -18,6 +18,7 @@ import { writeFileSync, existsSync, mkdirSync } from "fs";
 import { isGitRepo, getRelativePath, getFileDiffStats } from "../git-utils.js";
 import { join } from "path";
 import { homedir } from "os";
+import type { Attachment } from "../types.js";
 
 export type RunnerOptions = {
   prompt: string;
@@ -25,6 +26,7 @@ export type RunnerOptions = {
   resumeSessionId?: string;
   onEvent: (event: ServerEvent) => void;
   onSessionUpdate?: (updates: Partial<Session>) => void;
+  attachments?: Attachment[];
 };
 
 export type RunnerHandle = {
@@ -92,7 +94,7 @@ const redactMessagesForLog = (messages: ChatMessage[]) => {
 
 
 export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
-  const { prompt, session, onEvent, onSessionUpdate } = options;
+  const { prompt, session, onEvent, onSessionUpdate, attachments } = options;
   let aborted = false;
   const abortController = new AbortController();
   const MAX_STREAM_RETRIES = 3;
@@ -496,10 +498,45 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         const formattedPrompt = shouldAddMemory 
           ? getInitialPrompt(prompt, memoryContent)
           : getInitialPrompt(prompt);
-        messages.push({
-          role: 'user',
-          content: formattedPrompt
-        });
+        
+        // Build user message content - support multimodal with attachments
+        if (attachments && attachments.length > 0) {
+          // Create multipart content with text and images/media
+          type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
+          const content: ContentPart[] = [];
+          
+          // Add text prompt first
+          if (formattedPrompt) {
+            content.push({ type: 'text', text: formattedPrompt });
+          }
+          
+          // Add attachments (currently only images are supported by most APIs)
+          for (const attachment of attachments) {
+            if (attachment.type === 'image') {
+              content.push({
+                type: 'image_url',
+                image_url: { url: attachment.dataUrl }
+              });
+            } else if (attachment.type === 'video' || attachment.type === 'audio') {
+              // For video/audio, add as text description since not all APIs support them natively
+              // The file is still attached and can be referenced, but won't be processed as media
+              content.push({
+                type: 'text',
+                text: `[Attached ${attachment.type}: ${attachment.name}]`
+              });
+            }
+          }
+          
+          messages.push({
+            role: 'user',
+            content: content
+          });
+        } else {
+          messages.push({
+            role: 'user',
+            content: formattedPrompt
+          });
+        }
       }
 
       // Track total usage across all iterations

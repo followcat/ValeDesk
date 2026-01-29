@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ServerEvent, SessionStatus, StreamMessage, TodoItem, FileChange, MultiThreadTask, LLMModel, LLMProvider, LLMProviderSettings } from "../types";
+import type { ServerEvent, SessionStatus, StreamMessage, TodoItem, FileChange, MultiThreadTask, LLMModel, LLMProvider, LLMProviderSettings, Attachment } from "../types";
 import { getPlatform } from "../platform";
 
 export type PermissionRequest = {
@@ -56,6 +56,8 @@ interface AppState {
   schedulerDefaultModel: string | null;
   schedulerDefaultTemperature: number | null;
   schedulerDefaultSendTemperature: boolean | null;
+  // Attachments for multimodal support
+  attachments: Attachment[];
 
   setPrompt: (prompt: string) => void;
   setCwd: (cwd: string) => void;
@@ -77,6 +79,10 @@ interface AppState {
   setLLMProviders: (providers: LLMProvider[]) => void;
   setLLMModels: (models: LLMModel[]) => void;
   setLLMProviderSettings: (settings: LLMProviderSettings) => void;
+  // Attachment actions
+  addAttachment: (attachment: Attachment) => void;
+  removeAttachment: (id: string) => void;
+  clearAttachments: () => void;
 }
 
 function createSession(id: string): SessionView {
@@ -105,6 +111,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   schedulerDefaultModel: null,
   schedulerDefaultTemperature: null,
   schedulerDefaultSendTemperature: null,
+  attachments: [],
 
   setPrompt: (prompt) => set({ prompt }),
   setCwd: (cwd) => set({ cwd }),
@@ -134,6 +141,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setLLMProviders: (llmProviders) => set({ llmProviders }),
   setLLMModels: (llmModels) => set({ llmModels }),
   setLLMProviderSettings: (llmProviderSettings) => set({ llmProviderSettings }),
+  // Attachment actions
+  addAttachment: (attachment) => set((state) => ({ attachments: [...state.attachments, attachment] })),
+  removeAttachment: (id) => set((state) => ({ attachments: state.attachments.filter(a => a.id !== id) })),
+  clearAttachments: () => set({ attachments: [] }),
   deleteMultiThreadTask: (taskId) => {
     set((state) => {
       const nextTasks = { ...state.multiThreadTasks };
