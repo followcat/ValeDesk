@@ -279,6 +279,8 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       
       // Load legacy settings for other configuration (tools, permissions, etc)
       const guiSettings = loadApiSettings();
+      // Tools that call OpenAI-compatible APIs should use the *current* provider credentials/baseURL.
+      const toolApiSettings = { ...(guiSettings || {}), apiKey, baseUrl: baseURL };
 
       // Custom fetch to capture error response bodies
       const originalFetch = global.fetch;
@@ -350,7 +352,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
 
       // Initialize tool executor with API settings for web tools
       // If no cwd, pass empty string to enable "no workspace" mode
-      const toolExecutor = new ToolExecutor(session.cwd || '', guiSettings, schedulerIPCCallback);
+      const toolExecutor = new ToolExecutor(session.cwd || '', toolApiSettings as any, schedulerIPCCallback);
 
       // Build conversation history from session
       const currentCwd = session.cwd || 'No workspace folder';
