@@ -273,22 +273,50 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
           }
         }
       }
-      // Items exist but no images found, allow default paste behavior (text)
-      return;
+      // Items exist but no image file exposed (common in Tauri for system screenshots).
+      // Fall through to Path 2.
     }
     
     // Path 2: Fallback to Clipboard API for Tauri/system screenshots
     // Required because Tauri WebView may not expose clipboardData.items for system screenshots
     // (like Cmd+Shift+4 on Mac or Win+Shift+S on Windows)
-    // Note: When clipboardData.items is empty, we attempt to read from the Clipboard API.
-    // This may result in both text paste (default behavior) and image attachment if clipboard has both.
+    // Note: This may result in both text paste (default behavior) and image attachment if clipboard has both.
+
+    const tryTauriClipboardImage = async () => {
+      try {
+        const tauri = (window as any).__TAURI__;
+        const invoke = tauri?.invoke || tauri?.core?.invoke;
+        if (typeof invoke !== 'function') return;
+
+        const dataUrl: string | null = await invoke('read_clipboard_image');
+        if (!dataUrl) return;
+
+        e.preventDefault();
+        addScreenshotAttachment({
+          id: generateId(),
+          type: 'image',
+          name: `Screenshot ${new Date().toLocaleTimeString()}`,
+          mimeType: 'image/png',
+          dataUrl,
+          size: 0,
+        });
+      } catch (e2) {
+        console.warn('[PromptInput] Tauri clipboard image fallback failed:', e2);
+      }
+    };
+
     if (navigator.clipboard?.read) {
-      navigator.clipboard.read()
+      navigator.clipboard
+        .read()
         .then((clipboardItems) => {
+          let foundImage = false;
           for (const item of clipboardItems) {
-            const imageType = item.types.find(type => type.startsWith('image/'));
+            const imageType = item.types.find((type) => type.startsWith('image/'));
             if (imageType) {
-              return item.getType(imageType)
+              foundImage = true;
+              e.preventDefault();
+              return item
+                .getType(imageType)
                 .then((blob) => {
                   const file = new File([blob], `screenshot-${Date.now()}`, { type: imageType });
                   return processFile(file);
@@ -298,11 +326,16 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
                 });
             }
           }
+          if (!foundImage) {
+            void tryTauriClipboardImage();
+          }
         })
-        .catch((error) => {
-          // Silently fail - user can use file upload button instead
+        .catch(async (error) => {
           console.warn('[PromptInput] Clipboard read failed:', error);
+          await tryTauriClipboardImage();
         });
+    } else {
+      void tryTauriClipboardImage();
     }
   }, [processFile, addScreenshotAttachment]);
 

@@ -50,6 +50,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
   const [enableDuckDuckGo, setEnableDuckDuckGo] = useState(currentSettings?.enableDuckDuckGo || false);
   const [enableFetchTools, setEnableFetchTools] = useState(currentSettings?.enableFetchTools || false);
   const [enableImageTools, setEnableImageTools] = useState(currentSettings?.enableImageTools ?? false);
+  const [conversationDataDir, setConversationDataDir] = useState(currentSettings?.conversationDataDir || "");
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [showTavilyPassword, setShowTavilyPassword] = useState(false);
   const [showZaiPassword, setShowZaiPassword] = useState(false);
@@ -132,6 +133,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       setEnableDuckDuckGo(currentSettings.enableDuckDuckGo || false);
       setEnableFetchTools(currentSettings.enableFetchTools || false);
       setEnableImageTools(currentSettings.enableImageTools ?? false);
+      setConversationDataDir(currentSettings.conversationDataDir || "");
     }
     
     // ALWAYS load LLM providers from separate file
@@ -293,7 +295,8 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       enableDuckDuckGo,
       enableFetchTools,
       enableImageTools,
-      llmProviders: llmProviderSettings
+      llmProviders: llmProviderSettings,
+      conversationDataDir: conversationDataDir.trim() || undefined
     };
     
     console.log('[SettingsModal] Full settings to save:', settingsToSave);
@@ -332,6 +335,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
     setEnableDuckDuckGo(false);
     setEnableFetchTools(false);
     setEnableImageTools(false);
+    setConversationDataDir("");
   };
 
   useEffect(() => {
@@ -457,6 +461,8 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
                 setEnableFetchTools={setEnableFetchTools}
                 enableImageTools={enableImageTools}
                 setEnableImageTools={setEnableImageTools}
+                conversationDataDir={conversationDataDir}
+                setConversationDataDir={setConversationDataDir}
               />
             ) : activeTab === 'skills' ? (
               <div className="p-6">
@@ -1354,10 +1360,45 @@ function ToolsTab({
   enableFetchTools,
   setEnableFetchTools,
   enableImageTools,
-  setEnableImageTools
+  setEnableImageTools,
+  conversationDataDir,
+  setConversationDataDir
 }: any) {
   return (
     <div className="px-6 py-4 space-y-6">
+      <div>
+        <label className="block text-sm font-medium text-ink-700 mb-3">
+          Conversation Data Directory
+          <span className="ml-2 text-xs font-normal text-ink-500">Used when starting a new session without a workspace</span>
+        </label>
+
+        <div className="flex gap-2">
+          <input
+            value={conversationDataDir || ''}
+            onChange={(e) => setConversationDataDir(e.target.value)}
+            placeholder="/path/to/valedesk/conversations"
+            className="flex-1 px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
+          />
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const dir = await getPlatform().selectDirectory();
+                if (dir) setConversationDataDir(dir);
+              } catch (error) {
+                console.error('[SettingsModal] selectDirectory failed', { error });
+              }
+            }}
+            className="px-4 py-2.5 text-sm font-medium text-ink-700 bg-ink-50 rounded-lg hover:bg-ink-100 transition-colors"
+          >
+            Browse…
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-ink-500">
+          If set, ValeDesk will create <span className="font-mono">{`{dir}/{sessionId}`}</span> and use it for file I/O.
+        </p>
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-ink-700 mb-3">
           Tool Groups

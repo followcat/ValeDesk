@@ -156,6 +156,11 @@ export type ApiSettings = {
   enableFetchTools?: boolean; // Enable fetch/fetch_json/download tools
   enableImageTools?: boolean; // Enable attach_image tool
   llmProviders?: LLMProviderSettings; // LLM providers and models configuration
+
+  // If set, new sessions created without a workspace folder will use:
+  //   {conversationDataDir}/{sessionId}
+  // as their working directory for file I/O.
+  conversationDataDir?: string;
 };
 
 export type ModelInfo = {
