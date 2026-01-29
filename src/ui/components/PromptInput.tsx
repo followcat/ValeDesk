@@ -244,29 +244,67 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
     }
   }, [processFile, addAttachment]);
 
-  // Handle paste event for screenshots
-  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
+  // Helper to add image attachment with screenshot naming
+  const addScreenshotAttachment = useCallback((attachment: Attachment) => {
+    addAttachment({
+      ...attachment,
+      name: `Screenshot ${new Date().toLocaleTimeString()}`
+    });
+  }, [addAttachment]);
 
-    for (const item of Array.from(items)) {
-      if (item.type.startsWith('image/')) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        if (file) {
-          const attachment = await processFile(file);
-          if (attachment) {
-            // Give pasted images a meaningful name (create new object to avoid mutation)
-            addAttachment({
-              ...attachment,
-              name: `Screenshot ${new Date().toLocaleTimeString()}`
-            });
+  // Handle paste event for screenshots
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    // Path 1: Try direct clipboard items (works for most browsers and file-based pastes)
+    const items = e.clipboardData?.items;
+    if (items && items.length > 0) {
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            processFile(file)
+              .then((attachment) => {
+                if (attachment) addScreenshotAttachment(attachment);
+              })
+              .catch((error) => {
+                console.warn('[PromptInput] Failed to process pasted image:', error);
+              });
+            return; // Successfully found image in clipboard, exit
           }
         }
-        return;
       }
+      // Items exist but no images found, allow default paste behavior (text)
+      return;
     }
-  }, [processFile, addAttachment]);
+    
+    // Path 2: Fallback to Clipboard API for Tauri/system screenshots
+    // Required because Tauri WebView may not expose clipboardData.items for system screenshots
+    // (like Cmd+Shift+4 on Mac or Win+Shift+S on Windows)
+    // Note: When clipboardData.items is empty, we attempt to read from the Clipboard API.
+    // This may result in both text paste (default behavior) and image attachment if clipboard has both.
+    if (navigator.clipboard?.read) {
+      navigator.clipboard.read()
+        .then((clipboardItems) => {
+          for (const item of clipboardItems) {
+            const imageType = item.types.find(type => type.startsWith('image/'));
+            if (imageType) {
+              return item.getType(imageType)
+                .then((blob) => {
+                  const file = new File([blob], `screenshot-${Date.now()}`, { type: imageType });
+                  return processFile(file);
+                })
+                .then((attachment) => {
+                  if (attachment) addScreenshotAttachment(attachment);
+                });
+            }
+          }
+        })
+        .catch((error) => {
+          // Silently fail - user can use file upload button instead
+          console.warn('[PromptInput] Clipboard read failed:', error);
+        });
+    }
+  }, [processFile, addScreenshotAttachment]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter to send (without Shift)
