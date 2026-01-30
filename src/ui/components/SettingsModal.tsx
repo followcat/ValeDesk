@@ -51,6 +51,10 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
   const [enableFetchTools, setEnableFetchTools] = useState(currentSettings?.enableFetchTools || false);
   const [enableImageTools, setEnableImageTools] = useState(currentSettings?.enableImageTools ?? false);
   const [conversationDataDir, setConversationDataDir] = useState(currentSettings?.conversationDataDir || "");
+  const [useGitForDiff, setUseGitForDiff] = useState(currentSettings?.useGitForDiff ?? true);
+  const [enableSessionGitRepo, setEnableSessionGitRepo] = useState(currentSettings?.enableSessionGitRepo ?? false);
+  const [sessionGitChecking, setSessionGitChecking] = useState(false);
+  const [sessionGitError, setSessionGitError] = useState<string | null>(null);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [showTavilyPassword, setShowTavilyPassword] = useState(false);
   const [showZaiPassword, setShowZaiPassword] = useState(false);
@@ -103,6 +107,32 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
     }
   }, []);
 
+  const handleSessionGitToggle = useCallback(async (nextEnabled: boolean) => {
+    if (!nextEnabled) {
+      setEnableSessionGitRepo(false);
+      setSessionGitError(null);
+      return;
+    }
+
+    setSessionGitChecking(true);
+    setSessionGitError(null);
+    try {
+      const available = await getPlatform().invoke<boolean>("check-git-available");
+      if (available) {
+        setEnableSessionGitRepo(true);
+      } else {
+        setEnableSessionGitRepo(false);
+        setSessionGitError("Git was not found. Install Git to enable session repositories.");
+      }
+    } catch (error) {
+      console.error("[SettingsModal] Failed to check Git availability:", error);
+      setEnableSessionGitRepo(false);
+      setSessionGitError("Failed to check Git availability.");
+    } finally {
+      setSessionGitChecking(false);
+    }
+  }, []);
+
   const saveMemoryContent = async () => {
     try {
       await getPlatform().invoke('write-memory', memoryContent);
@@ -134,6 +164,10 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       setEnableFetchTools(currentSettings.enableFetchTools || false);
       setEnableImageTools(currentSettings.enableImageTools ?? false);
       setConversationDataDir(currentSettings.conversationDataDir || "");
+      setUseGitForDiff(currentSettings.useGitForDiff ?? true);
+      setEnableSessionGitRepo(currentSettings.enableSessionGitRepo ?? false);
+      setSessionGitChecking(false);
+      setSessionGitError(null);
     }
     
     // ALWAYS load LLM providers from separate file
@@ -295,8 +329,10 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       enableDuckDuckGo,
       enableFetchTools,
       enableImageTools,
+      useGitForDiff,
       llmProviders: llmProviderSettings,
-      conversationDataDir: conversationDataDir.trim() || undefined
+      conversationDataDir: conversationDataDir.trim() || undefined,
+      enableSessionGitRepo
     };
     
     console.log('[SettingsModal] Full settings to save:', settingsToSave);
@@ -336,6 +372,10 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
     setEnableFetchTools(false);
     setEnableImageTools(false);
     setConversationDataDir("");
+    setUseGitForDiff(true);
+    setEnableSessionGitRepo(false);
+    setSessionGitChecking(false);
+    setSessionGitError(null);
   };
 
   useEffect(() => {
@@ -463,6 +503,12 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
                 setEnableImageTools={setEnableImageTools}
                 conversationDataDir={conversationDataDir}
                 setConversationDataDir={setConversationDataDir}
+                useGitForDiff={useGitForDiff}
+                setUseGitForDiff={setUseGitForDiff}
+                enableSessionGitRepo={enableSessionGitRepo}
+                sessionGitChecking={sessionGitChecking}
+                sessionGitError={sessionGitError}
+                onToggleSessionGitRepo={handleSessionGitToggle}
               />
             ) : activeTab === 'skills' ? (
               <div className="p-6">
@@ -1362,7 +1408,13 @@ function ToolsTab({
   enableImageTools,
   setEnableImageTools,
   conversationDataDir,
-  setConversationDataDir
+  setConversationDataDir,
+  useGitForDiff,
+  setUseGitForDiff,
+  enableSessionGitRepo,
+  sessionGitChecking,
+  sessionGitError,
+  onToggleSessionGitRepo
 }: any) {
   const [defaultDir, setDefaultDir] = useState<string>("");
 
@@ -1417,6 +1469,38 @@ function ToolsTab({
         <p className="mt-2 text-xs text-ink-500">
           If set, ValeDesk will create <span className="font-mono">{`{dir}/{sessionId}`}</span> and use it for file I/O.
         </p>
+      </div>
+
+      <div className="border-t border-ink-900/10 pt-4">
+        <label className="block text-sm font-medium text-ink-700 mb-3">
+          Session Git Repo
+          <span className="ml-2 text-xs font-normal text-ink-500">Initialize a git repo in each session folder</span>
+        </label>
+        <label className="flex items-center justify-between cursor-pointer">
+          <div className="flex-1">
+            <span className="block text-sm font-medium text-ink-700">Enable per-session Git</span>
+            <p className="mt-0.5 text-xs text-ink-500">
+              {sessionGitChecking
+                ? "Checking for Git..."
+                : "Requires system Git. The app will initialize a repo if none exists."}
+            </p>
+          </div>
+          <div className="relative">
+            <input
+              type="checkbox"
+              checked={!!enableSessionGitRepo}
+              onChange={(e) => onToggleSessionGitRepo?.(e.target.checked)}
+              disabled={sessionGitChecking}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-ink-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent peer-disabled:opacity-50"></div>
+          </div>
+        </label>
+        {sessionGitError && (
+          <p className="mt-2 text-xs text-error">
+            {sessionGitError}
+          </p>
+        )}
       </div>
 
       <div>
@@ -1519,6 +1603,33 @@ function ToolsTab({
             <div className="w-11 h-6 bg-ink-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
           </div>
         </label>
+
+        {/* Diff Source */}
+        <div className="border-t border-ink-900/10 pt-4 mt-4">
+          <label className="block text-sm font-medium text-ink-700 mb-3">
+            Diff Source
+            <span className="ml-2 text-xs font-normal text-ink-500">Choose how to get old file version for diff</span>
+          </label>
+          <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex-1">
+              <span className="block text-sm font-medium text-ink-700">Use Git for Diff</span>
+              <p className="mt-0.5 text-xs text-ink-500">
+                {useGitForDiff 
+                  ? "Using git HEAD version for old file content (requires git repo)"
+                  : "Using file snapshots for old file content (works without git)"}
+              </p>
+            </div>
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={useGitForDiff}
+                onChange={(e) => setUseGitForDiff(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-ink-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+            </div>
+          </label>
+        </div>
       </div>
     </div>
   );

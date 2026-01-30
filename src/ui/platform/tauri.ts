@@ -137,6 +137,71 @@ export function createTauriPlatform(): PlatformAdapter {
           const path = String(args[0] ?? "");
           return tauriInvoke("open_path_in_finder", { path });
         }
+        case "check-git-available": {
+          return tauriInvoke("check_git_available");
+        }
+        case "get-file-old-content": {
+          const filePath = String(args[0] ?? "");
+          const cwd = String(args[1] ?? "");
+          const useGit = args[2] !== undefined ? Boolean(args[2]) : true;
+          // Tauri expects parameters wrapped in a 'params' object
+          return tauriInvoke("get_file_old_content", { 
+            params: {
+              filePath: filePath, 
+              cwd: cwd, 
+              useGit: useGit 
+            }
+          });
+        }
+        case "get-file-new-content": {
+          const filePath = String(args[0] ?? "");
+          const cwd = String(args[1] ?? "");
+          const useGit = args[2] !== undefined ? Boolean(args[2]) : true;
+          // Tauri expects parameters wrapped in a 'params' object
+          return tauriInvoke("get_file_new_content", { 
+            params: {
+              filePath: filePath, 
+              cwd: cwd, 
+              useGit: useGit 
+            }
+          });
+        }
+        case "get-file-snapshot": {
+          const filePath = String(args[0] ?? "");
+          const cwd = String(args[1] ?? "");
+          // Tauri expects parameters wrapped in a 'params' object
+          return tauriInvoke("get_file_snapshot", { 
+            params: {
+              filePath, 
+              cwd 
+            }
+          });
+        }
+        case "get-file-content-at-commit": {
+          const filePath = String(args[0] ?? "");
+          const cwd = String(args[1] ?? "");
+          const commit = String(args[2] ?? "");
+          return tauriInvoke("get_file_content_at_commit", {
+            params: {
+              filePath,
+              cwd,
+              commit
+            }
+          });
+        }
+        case "save-file-snapshot": {
+          const filePath = String(args[0] ?? "");
+          const cwd = String(args[1] ?? "");
+          const content = String(args[2] ?? "");
+          // Tauri expects parameters wrapped in a 'params' object
+          return tauriInvoke("save_file_snapshot", { 
+            params: {
+              filePath, 
+              cwd, 
+              content 
+            }
+          });
+        }
         default: {
           // fail fast: do not silently pass unknown channels
           throw new Error(`[platform/tauri] Unsupported invoke channel: ${channel}`);
@@ -160,4 +225,3 @@ export function createTauriPlatform(): PlatformAdapter {
     },
   };
 }
-

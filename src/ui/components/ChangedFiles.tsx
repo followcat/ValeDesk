@@ -6,6 +6,7 @@ export interface ChangedFile {
   lines_removed: number;
   content_old?: string;
   content_new?: string;
+  commitHash?: string;
 }
 
 export interface ChangedFilesProps {
@@ -57,11 +58,19 @@ export function ChangedFiles({ files, onApply, onReject, onViewDiff }: ChangedFi
                 <div className="text-sm font-medium text-ink-800 truncate">
                   {file.file_path}
                 </div>
-                <div className="text-xs text-muted">
-                  <span className="text-success font-medium">+{formatNumber(file.lines_added)}</span>
-                  <span className="text-ink-400 mx-1">·</span>
-                  <span className="text-error font-medium">-{formatNumber(file.lines_removed)}</span>
-                </div>
+                {(file.lines_added > 0 || file.lines_removed > 0) && (
+                  <div className="text-xs text-muted">
+                    {file.lines_added > 0 && (
+                      <span className="text-success font-medium">+{formatNumber(file.lines_added)}</span>
+                    )}
+                    {file.lines_added > 0 && file.lines_removed > 0 && (
+                      <span className="text-ink-400 mx-1">·</span>
+                    )}
+                    {file.lines_removed > 0 && (
+                      <span className="text-error font-medium">-{formatNumber(file.lines_removed)}</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -37,12 +37,14 @@ export type ApiSettings = {
   enableDuckDuckGo?: boolean; // Enable search/search_news/search_images (no API key needed)
   enableFetchTools?: boolean; // Enable fetch/fetch_json/download tools
   enableImageTools?: boolean; // Enable attach_image tool
+  useGitForDiff?: boolean; // Use git for diff (true) or file snapshots (false)
   llmProviders?: LLMProviderSettings; // LLM providers and models configuration
 
   // If set, new sessions created without a workspace folder will use:
   //   {conversationDataDir}/{sessionId}
   // as their working directory for file I/O.
   conversationDataDir?: string;
+  enableSessionGitRepo?: boolean; // Initialize a git repo in session folders when available
 };
 
 export type ModelInfo = {
@@ -133,6 +135,7 @@ export interface FileChange {
   additions: number;         // Number of lines added
   deletions: number;         // Number of lines deleted
   status: ChangeStatus;      // 'pending' = can be rolled back, 'confirmed' = cannot rollback
+  commitHash?: string;       // Commit hash for showing commit-level diffs
 }
 
 // Thread info for listing threads in a session
