@@ -333,6 +333,7 @@ fn handle_session_sync(db: &Arc<Database>, payload: &Value) {
         model: data.get("model").and_then(|v| v.as_str()).map(String::from),
         thread_id: data.get("threadId").and_then(|v| v.as_str()).map(String::from),
         temperature: None,
+        enable_session_git_repo: data.get("enableSessionGitRepo").and_then(|v| v.as_bool()),
       };
       if let Err(e) = db.create_session(&params) {
         eprintln!("[session.sync:create] Failed: {}", e);
