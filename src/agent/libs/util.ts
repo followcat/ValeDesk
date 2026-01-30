@@ -1,5 +1,6 @@
 import { claudeCodeEnv, loadClaudeSettingsEnv } from "./claude-settings.js";
 import { loadApiSettings } from "./settings-store.js";
+import { loadLLMProviderSettings } from "./llm-providers-store.js";
 import type { ApiSettings } from "../types.js";
 import { join } from "path";
 import { homedir } from "os";
@@ -82,26 +83,61 @@ export function getEnhancedEnv(guiSettings?: ApiSettings | null): Record<string,
 export const claudeCodePath = getClaudeCodePath();
 export const enhancedEnv = getEnhancedEnv();
 
-export const generateSessionTitle = async (userIntent: string | null) => {
+export const generateSessionTitle = async (userIntent: string | null, sessionModel?: string) => {
   if (!userIntent) return "New Chat";
 
   try {
-    // Load GUI settings with priority
-    const guiSettings = loadApiSettings();
+    let apiKey: string | undefined;
+    let baseURL: string | undefined;
+    let modelName: string | undefined;
+
+    // Prefer provider-based config when model is in provider::model format
+    if (sessionModel && sessionModel.includes("::")) {
+      const [providerId, modelId] = sessionModel.split("::");
+      const llmSettings = loadLLMProviderSettings();
+
+      if (llmSettings) {
+        const provider = llmSettings.providers.find((p) => p.id === providerId);
+        if (provider && provider.type !== "claude-code") {
+          apiKey = provider.apiKey;
+          modelName = modelId;
+
+          if (provider.type === "openrouter") {
+            baseURL = "https://openrouter.ai/api/v1";
+          } else if (provider.type === "zai") {
+            const prefix = provider.zaiApiPrefix === "coding" ? "api/coding/paas" : "api/paas";
+            baseURL = `https://api.z.ai/${prefix}/v4`;
+          } else {
+            baseURL = provider.baseUrl || undefined;
+          }
+        }
+      }
+    }
+
+    // Fall back to legacy API settings
+    if (!apiKey) {
+      const guiSettings = loadApiSettings();
+
+      if (guiSettings && guiSettings.apiKey) {
+        apiKey = guiSettings.apiKey;
+        baseURL = guiSettings.baseUrl || undefined;
+        modelName = guiSettings.model;
+      }
+    }
 
     // If no valid settings, use simple fallback
-    if (!guiSettings || !guiSettings.apiKey) {
+    if (!apiKey) {
       return extractFallbackTitle(userIntent);
     }
 
     // Create OpenAI client with user settings
     const client = new OpenAI({
-      apiKey: guiSettings.apiKey,
-      baseURL: guiSettings.baseUrl ? `${guiSettings.baseUrl}` : undefined,
+      apiKey,
+      baseURL: baseURL ? `${baseURL}` : undefined,
     });
 
     const response = await client.chat.completions.create({
-      model: guiSettings.model || 'gpt-3.5-turbo',
+      model: modelName || 'gpt-5-nano',
       messages: [
         {
           role: 'system',
@@ -158,19 +194,29 @@ function extractFallbackTitle(text: string): string {
     'this', 'that', 'these', 'those', 'it', 'its', 'i', 'me', 'my', 'we', 'our', 'you', 'your',
     'please', 'can', 'need', 'want', 'help', 'make', 'get', 'show', 'tell']);
 
-  const words = text
+  const cleaned = text
+    .normalize('NFKC')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .trim();
+
+  const words = cleaned
     .toLowerCase()
-    .replace(/[^\w\sа-яё]/gi, ' ')
     .split(/\s+/)
-    .filter(w => w.length > 2 && !stopWords.has(w))
+    .filter(w => w.length > 1 && !stopWords.has(w))
     .slice(0, 2);
 
-  if (words.length === 0) {
+  const titleRaw = words.length > 0
+    ? words.join(' ')
+    : cleaned.split(/\s+/).slice(0, 2).join(' ');
+
+  if (!titleRaw) {
     return "New Chat";
   }
 
-  // Capitalize first letter of each word
-  return words
+  // Capitalize first letter of each word (noop for non-Latin scripts)
+  return titleRaw
+    .split(/\s+/)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
+    .join(' ')
+    .slice(0, 30);
 }

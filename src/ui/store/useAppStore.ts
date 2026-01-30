@@ -27,6 +27,7 @@ export type SessionView = {
   outputTokens?: number;
   todos?: TodoItem[];
   fileChanges?: FileChange[];
+  fileChangesByMessage?: Record<number, FileChange[]>;
   historyHasMore?: boolean;
   historyCursor?: number;
   historyLoading?: boolean;
@@ -87,7 +88,7 @@ interface AppState {
 }
 
 function createSession(id: string): SessionView {
-  return { id, title: "", status: "idle", messages: [], permissionRequests: [], hydrated: false, todos: [], historyHasMore: false, historyLoading: false, historyLoadId: 0 };
+  return { id, title: "", status: "idle", messages: [], permissionRequests: [], hydrated: false, todos: [], fileChangesByMessage: {}, historyHasMore: false, historyLoading: false, historyLoadId: 0 };
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -242,6 +243,18 @@ export const useAppStore = create<AppState>((set, get) => ({
           const mergedMessages = loadType === "prepend"
             ? [...messages, ...(existing.messages || [])]
             : messages;
+          let fileChangesByMessage = loadType === "prepend" ? (existing.fileChangesByMessage || {}) : {};
+          if (loadType === "prepend" && Object.keys(fileChangesByMessage).length > 0) {
+            const shift = messages.length;
+            const shifted: Record<number, FileChange[]> = {};
+            Object.entries(fileChangesByMessage).forEach(([key, value]) => {
+              const index = Number(key);
+              if (!Number.isNaN(index)) {
+                shifted[index + shift] = value;
+              }
+            });
+            fileChangesByMessage = shifted;
+          }
           return {
             sessions: {
               ...state.sessions,
@@ -258,6 +271,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                 todos: todos ?? [],
                 // Load fileChanges from DB
                 fileChanges: fileChanges ?? [],
+                fileChangesByMessage,
                 historyHasMore: hasMore ?? existing.historyHasMore,
                 historyCursor: nextCursor ?? existing.historyCursor,
                 historyLoading: false,
@@ -577,12 +591,32 @@ export const useAppStore = create<AppState>((set, get) => ({
         const { sessionId, fileChanges } = event.payload;
         set((state) => {
           const existing = state.sessions[sessionId] ?? createSession(sessionId);
+          let fileChangesMessageIndex: number | null = null;
+          for (let i = existing.messages.length - 1; i >= 0; i -= 1) {
+            const msg = existing.messages[i] as any;
+            if (msg?.type === "result") {
+              fileChangesMessageIndex = i;
+              break;
+            }
+          }
+          if (fileChangesMessageIndex === null && existing.messages.length > 0) {
+            fileChangesMessageIndex = existing.messages.length - 1;
+          }
+          const nextFileChangesByMessage = { ...(existing.fileChangesByMessage || {}) };
+          if (fileChangesMessageIndex !== null) {
+            if (fileChanges.length > 0) {
+              nextFileChangesByMessage[fileChangesMessageIndex] = fileChanges;
+            } else {
+              delete nextFileChangesByMessage[fileChangesMessageIndex];
+            }
+          }
           return {
             sessions: {
               ...state.sessions,
               [sessionId]: {
                 ...existing,
-                fileChanges
+                fileChanges,
+                fileChangesByMessage: nextFileChangesByMessage
               }
             }
           };

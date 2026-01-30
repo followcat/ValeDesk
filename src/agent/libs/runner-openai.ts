@@ -5,7 +5,7 @@
  */
 
 import OpenAI from 'openai';
-import type { ServerEvent } from "../types.js";
+import type { ServerEvent, Attachment } from "../types.js";
 import type { Session } from "./session-store.js";
 import { loadApiSettings } from "./settings-store.js";
 import { loadLLMProviderSettings } from "./llm-providers-store.js";
@@ -18,7 +18,6 @@ import { writeFileSync, existsSync, mkdirSync } from "fs";
 import { isGitRepo, getRelativePath, getFileDiffStats } from "../git-utils.js";
 import { join } from "path";
 import { homedir } from "os";
-import type { Attachment } from "../types.js";
 import { executionLogger } from "./execution-logger.js";
 
 // Helper function to save attachment to disk
@@ -123,7 +122,6 @@ const redactMessagesForLog = (messages: ChatMessage[]) => {
 
 export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
   const { prompt, session, onEvent, onSessionUpdate, attachments } = options;
-
   // Initialize execution logger for this session
   executionLogger.setSession(session.id);
 
@@ -401,6 +399,104 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       
       // Load memory initially
       let memoryContent = await loadMemory();
+
+      const buildImageContents = async (items?: Attachment[]) => {
+        if (!items || items.length === 0) return [];
+
+        const results: Array<{ type: "image_url"; image_url: { url: string } }> = [];
+        for (const item of items) {
+          if (!item || item.type !== "image") continue;
+
+          if (item.dataUrl) {
+            results.push({ type: "image_url", image_url: { url: item.dataUrl } });
+            continue;
+          }
+
+          if (!item.path) continue;
+          if (!guiSettings?.enableImageTools) {
+            console.warn("[OpenAI Runner] Image attachments ignored (enableImageTools is off).");
+            continue;
+          }
+
+          const result = await toolExecutor.executeTool("attach_image", {
+            explanation: "Attach image",
+            file_path: item.path
+          });
+          if (result.success && result.data && (result.data as any).dataUrl) {
+            results.push({ type: "image_url", image_url: { url: (result.data as any).dataUrl } });
+          } else {
+            console.warn("[OpenAI Runner] Failed to attach image:", result.error || "unknown error");
+          }
+        }
+        return results;
+      };
+
+      const resolveAttachmentPath = (item: Attachment): string | null => {
+        if (item.path) {
+          return currentCwd && currentCwd !== 'No workspace folder'
+            ? join(currentCwd, item.path)
+            : item.path;
+        }
+        if (!currentCwd || currentCwd === 'No workspace folder' || !item.dataUrl) return null;
+        return saveAttachmentToDisk(item, currentCwd);
+      };
+
+      const buildUserContent = async (
+        promptText: string,
+        includeMemory: boolean,
+        items?: Attachment[]
+      ) => {
+        const hasItems = Array.isArray(items) && items.length > 0;
+        const safePrompt = promptText.trim().length > 0
+          ? promptText
+          : hasItems
+            ? "User attached file(s)."
+            : promptText;
+        const formattedPrompt = includeMemory
+          ? getInitialPrompt(safePrompt, memoryContent)
+          : getInitialPrompt(safePrompt);
+
+        if (!hasItems) return formattedPrompt;
+
+        type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+        const content: ContentPart[] = [];
+        if (formattedPrompt) {
+          content.push({ type: "text", text: formattedPrompt });
+        }
+
+        const imageContents = await buildImageContents(items);
+        if (imageContents.length > 0) {
+          content.push(...imageContents);
+        }
+
+        for (const item of items) {
+          if (!item) continue;
+          if (item.type === "image") {
+            const savedPath = resolveAttachmentPath(item);
+            if (savedPath) {
+              content.push({
+                type: "text",
+                text: `[Image saved to: ${savedPath}]\nUse this path if you need to edit or process the image with tools.`
+              });
+            }
+          } else if (item.type === "video" || item.type === "audio") {
+            const savedPath = resolveAttachmentPath(item);
+            if (savedPath) {
+              content.push({
+                type: "text",
+                text: `[Attached ${item.type} file: ${item.name}]\nThe file has been saved to: ${savedPath}\nYou can now access it using bash, ffmpeg, or other tools.`
+              });
+            } else {
+              content.push({
+                type: "text",
+                text: `[Attached ${item.type}: ${item.name}]\n⚠️ File could not be saved to workspace. ${currentCwd && currentCwd !== 'No workspace folder' ? 'Save failed.' : 'No workspace directory configured.'}`
+              });
+            }
+          }
+        }
+
+        return content;
+      };
       
       // Get initial tools for system prompt
       const initialTools = getTools(guiSettings);
@@ -483,57 +579,16 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
               lastUserPromptHadAttachments = hasPromptAttachments;
               
               // ALWAYS format user prompts with date (even from history)
-              const formattedPromptText = isFirstUserPrompt 
-                ? getInitialPrompt(promptText, memoryContent)
-                : getInitialPrompt(promptText);
+              const userContent = await buildUserContent(
+                promptText,
+                isFirstUserPrompt,
+                (msg as any).attachments
+              );
               isFirstUserPrompt = false;
-
-              if (hasPromptAttachments) {
-                type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
-                const content: ContentPart[] = [];
-
-                if (formattedPromptText) {
-                  content.push({ type: 'text', text: formattedPromptText });
-                }
-
-                for (const attachment of promptAttachments) {
-                  if (attachment.type === 'image') {
-                    // Save image to disk for tool access
-                    const savedPath = currentCwd ? saveAttachmentToDisk(attachment, currentCwd) : null;
-                    
-                    content.push({ type: 'image_url', image_url: { url: attachment.dataUrl } });
-                    
-                    if (savedPath) {
-                      content.push({ 
-                        type: 'text', 
-                        text: `[Image saved to: ${savedPath}]\nUse this path if you need to edit or process the image with tools.` 
-                      });
-                    }
-                  } else if (attachment.type === 'video' || attachment.type === 'audio') {
-                    // For historical attachments, try to save to disk
-                    const savedPath = currentCwd ? saveAttachmentToDisk(attachment, currentCwd) : null;
-                    
-                    if (savedPath) {
-                      content.push({ 
-                        type: 'text', 
-                        text: `[Attached ${attachment.type} file: ${attachment.name}]\nSaved to: ${savedPath}` 
-                      });
-                    } else {
-                      content.push({ 
-                        type: 'text', 
-                        text: `[Attached ${attachment.type}: ${attachment.name}]` 
-                      });
-                    }
-                  }
-                }
-
-                messages.push({ role: 'user', content });
-              } else {
-                messages.push({
-                  role: 'user',
-                  content: formattedPromptText
-                });
-              }
+              messages.push({
+                role: 'user',
+                content: userContent
+              });
             } else if (msg.type === 'text') {
               // Accumulate text into assistant message
               currentAssistantText += (msg as any).text || '';
@@ -598,70 +653,11 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         // Always format prompt with current date for context
         // Add memory only if this is a new session (no history)
         const shouldAddMemory = messages.length === 1; // Only system message exists
-        const formattedPrompt = shouldAddMemory 
-          ? getInitialPrompt(prompt, memoryContent)
-          : getInitialPrompt(prompt);
-        
-        // Build user message content - support multimodal with attachments
-        if (attachments && attachments.length > 0) {
-          // Create multipart content with text and images/media
-          type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
-          const content: ContentPart[] = [];
-          
-          // Add text prompt first
-          if (formattedPrompt) {
-            content.push({ type: 'text', text: formattedPrompt });
-          }
-          
-          // Add attachments - save all to disk for tool access
-          for (const attachment of attachments) {
-            if (attachment.type === 'image') {
-              // Save image to disk so tools like generate_image can access it
-              const savedPath = currentCwd ? saveAttachmentToDisk(attachment, currentCwd) : null;
-              
-              // Add image as data URL for visual understanding
-              content.push({
-                type: 'image_url',
-                image_url: { url: attachment.dataUrl }
-              });
-              
-              // Also add file path info so LLM can use it with tools
-              if (savedPath) {
-                content.push({
-                  type: 'text',
-                  text: `[Image saved to: ${savedPath}]\nUse this path if you need to edit or process the image with tools.`
-                });
-              }
-            } else if (attachment.type === 'video' || attachment.type === 'audio') {
-              // For video/audio, save to disk first so LLM can access them
-              const savedPath = currentCwd ? saveAttachmentToDisk(attachment, currentCwd) : null;
-              
-              if (savedPath) {
-                // File saved successfully - tell LLM about it
-                content.push({
-                  type: 'text',
-                  text: `[Attached ${attachment.type} file: ${attachment.name}]\nThe file has been saved to: ${savedPath}\nYou can now access it using bash, ffmpeg, or other tools.`
-                });
-              } else {
-                // Failed to save or no workspace
-                content.push({
-                  type: 'text',
-                  text: `[Attached ${attachment.type}: ${attachment.name}]\n⚠️ File could not be saved to workspace. ${currentCwd ? 'Save failed.' : 'No workspace directory configured.'}`
-                });
-              }
-            }
-          }
-          
-          messages.push({
-            role: 'user',
-            content: content
-          });
-        } else {
-          messages.push({
-            role: 'user',
-            content: formattedPrompt
-          });
-        }
+        const userContent = await buildUserContent(prompt, shouldAddMemory, attachments);
+        messages.push({
+          role: 'user',
+          content: userContent
+        });
       }
 
       // Track total usage across all iterations

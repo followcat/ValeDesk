@@ -10,6 +10,7 @@ export interface Attachment {
   mimeType: string;
   dataUrl: string; // base64 data URL
   size: number; // bytes
+  path?: string; // path relative to workspace (if saved)
 }
 
 export type UserPromptMessage = {

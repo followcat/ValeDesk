@@ -56,20 +56,18 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
 
   const handleSend = useCallback(async (options?: { enableSessionGitRepo?: boolean }) => {
     const trimmedPrompt = prompt.trim();
+    const hasAttachments = attachments.length > 0;
 
     // For existing sessions, require a prompt or attachments
-    if (activeSessionId && !trimmedPrompt && attachments.length === 0) return;
+    if (activeSessionId && !trimmedPrompt && !hasAttachments) return;
 
     if (!activeSessionId) {
       // Starting new session - can be empty for chat-only mode
       setPendingStart(true);
       
-      // Generate title from first 3 words of prompt
+      // Keep default title so backend can auto-generate when prompt exists
       let title = "New Chat";
-      if (trimmedPrompt) {
-        const words = trimmedPrompt.split(/\s+/).slice(0, 3);
-        title = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
-      } else if (attachments.length > 0) {
+      if (!trimmedPrompt && attachments.length > 0) {
         title = `Attachment: ${attachments[0].name}`;
       }
       sendEvent({
@@ -82,7 +80,7 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
           model: selectedModel || undefined,
           temperature: sendTemperature ? selectedTemperature : undefined,
           enableSessionGitRepo: options?.enableSessionGitRepo ?? apiSettings?.enableSessionGitRepo ?? false,
-          attachments: attachments.length > 0 ? attachments : undefined
+          attachments: hasAttachments ? attachments : undefined
         }
       });
       // Save selected model as default for future sessions
@@ -110,7 +108,7 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
         payload: {
           sessionId: activeSessionId,
           prompt: trimmedPrompt,
-          attachments: attachments.length > 0 ? attachments : undefined
+          attachments: hasAttachments ? attachments : undefined
         }
       });
     }
@@ -192,6 +190,11 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
   const addAttachment = useAppStore((state) => state.addAttachment);
   const removeAttachment = useAppStore((state) => state.removeAttachment);
   const setGlobalError = useAppStore((state) => state.setGlobalError);
+  const cwd = useAppStore((state) => state.cwd);
+  const activeSessionId = useAppStore((state) => state.activeSessionId);
+  const sessions = useAppStore((state) => state.sessions);
+  const activeSession = activeSessionId ? sessions[activeSessionId] : undefined;
+  const attachmentCwd = activeSession?.cwd || cwd;
 
   // Process file to attachment
   const processFile = useCallback(async (file: File): Promise<Attachment | null> => {
@@ -228,6 +231,35 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
     });
   }, [setGlobalError]);
 
+  const saveImageToWorkspace = useCallback(async (attachment: Attachment, fileName?: string) => {
+    if (attachment.type !== 'image') return attachment;
+    const targetCwd = attachmentCwd?.trim();
+    if (!targetCwd) return attachment;
+    const electron = (window as any).electron;
+    if (!electron?.savePastedImage) return attachment;
+
+    try {
+      const result = await electron.savePastedImage({
+        dataUrl: attachment.dataUrl,
+        cwd: targetCwd,
+        fileName: fileName || attachment.name
+      });
+      if (result?.path) {
+        return {
+          ...attachment,
+          path: result.path,
+          name: result.name || attachment.name,
+          mimeType: result.mime || attachment.mimeType,
+          size: typeof result.size === "number" ? result.size : attachment.size
+        };
+      }
+    } catch (error) {
+      console.warn('[PromptInput] Failed to save pasted image:', error);
+    }
+
+    return attachment;
+  }, [attachmentCwd]);
+
   // Handle file selection
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -246,100 +278,102 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
     }
   }, [processFile, addAttachment]);
 
-  // Helper to add image attachment with screenshot naming
-  const addScreenshotAttachment = useCallback((attachment: Attachment) => {
-    addAttachment({
-      ...attachment,
-      name: `Screenshot ${new Date().toLocaleTimeString()}`
-    });
-  }, [addAttachment]);
+  const addPastedAttachment = useCallback(async (file: File, nameOverride?: string) => {
+    const attachment = await processFile(file);
+    if (!attachment) return;
+    const renamed = nameOverride ? { ...attachment, name: nameOverride } : attachment;
+    const saved = await saveImageToWorkspace(renamed, renamed.name);
+    addAttachment(saved);
+  }, [addAttachment, processFile, saveImageToWorkspace]);
+
+  const addPastedDataUrl = useCallback(async (dataUrl: string, mimeType?: string) => {
+    const attachment: Attachment = {
+      id: generateId(),
+      type: 'image',
+      name: `Screenshot ${new Date().toLocaleTimeString()}.png`,
+      mimeType: mimeType || 'image/png',
+      dataUrl,
+      size: 0
+    };
+    const saved = await saveImageToWorkspace(attachment, attachment.name);
+    addAttachment(saved);
+  }, [addAttachment, saveImageToWorkspace]);
+
+  const readImageFromClipboardApi = useCallback(async () => {
+    if (!navigator.clipboard?.read) return null;
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        const imageType = item.types.find((type) => type.startsWith('image/'));
+        if (!imageType) continue;
+        const blob = await item.getType(imageType);
+        return new File([blob], `screenshot-${Date.now()}`, { type: imageType });
+      }
+    } catch (error) {
+      console.warn('[PromptInput] Clipboard API read failed:', error);
+    }
+    return null;
+  }, []);
+
+  const readImageFromSystemClipboard = useCallback(async () => {
+    try {
+      const electron = (window as any).electron;
+      if (electron?.readClipboardImage) {
+        const result = await electron.readClipboardImage();
+        if (result?.dataUrl) return result;
+      }
+    } catch (error) {
+      console.warn('[PromptInput] Electron clipboard image read failed:', error);
+    }
+
+    try {
+      const tauri = (window as any).__TAURI__;
+      const invoke = tauri?.invoke || tauri?.core?.invoke;
+      if (typeof invoke === 'function') {
+        const dataUrl: string | null = await invoke('read_clipboard_image');
+        if (dataUrl) return { dataUrl, mime: 'image/png' };
+      }
+    } catch (error) {
+      console.warn('[PromptInput] Tauri clipboard image fallback failed:', error);
+    }
+
+    return null;
+  }, []);
 
   // Handle paste event for screenshots
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    // Path 1: Try direct clipboard items (works for most browsers and file-based pastes)
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
     if (items && items.length > 0) {
-      for (const item of Array.from(items)) {
-        if (item.type.startsWith('image/')) {
+      const imageItems = Array.from(items).filter((item) => item.type.startsWith('image/'));
+      if (imageItems.length > 0) {
+        const hasText = e.clipboardData?.types?.includes("text/plain");
+        if (!hasText) e.preventDefault();
+        for (const item of imageItems) {
           const file = item.getAsFile();
           if (file) {
-            e.preventDefault();
-            processFile(file)
-              .then((attachment) => {
-                if (attachment) addScreenshotAttachment(attachment);
-              })
-              .catch((error) => {
-                console.warn('[PromptInput] Failed to process pasted image:', error);
-              });
-            return; // Successfully found image in clipboard, exit
+            void addPastedAttachment(file, `Screenshot ${new Date().toLocaleTimeString()}.png`);
           }
         }
+        return;
       }
-      // Items exist but no image file exposed (common in Tauri for system screenshots).
-      // Fall through to Path 2.
     }
-    
-    // Path 2: Fallback to Clipboard API for Tauri/system screenshots
-    // Required because Tauri WebView may not expose clipboardData.items for system screenshots
-    // (like Cmd+Shift+4 on Mac or Win+Shift+S on Windows)
-    // Note: This may result in both text paste (default behavior) and image attachment if clipboard has both.
 
-    const tryTauriClipboardImage = async () => {
-      try {
-        const tauri = (window as any).__TAURI__;
-        const invoke = tauri?.invoke || tauri?.core?.invoke;
-        if (typeof invoke !== 'function') return;
+    const hasText = e.clipboardData?.types?.includes("text/plain");
+    if (!hasText) e.preventDefault();
 
-        const dataUrl: string | null = await invoke('read_clipboard_image');
-        if (!dataUrl) return;
-
-        e.preventDefault();
-        addScreenshotAttachment({
-          id: generateId(),
-          type: 'image',
-          name: `Screenshot ${new Date().toLocaleTimeString()}`,
-          mimeType: 'image/png',
-          dataUrl,
-          size: 0,
-        });
-      } catch (e2) {
-        console.warn('[PromptInput] Tauri clipboard image fallback failed:', e2);
+    void (async () => {
+      const file = await readImageFromClipboardApi();
+      if (file) {
+        await addPastedAttachment(file, `Screenshot ${new Date().toLocaleTimeString()}.png`);
+        return;
       }
-    };
 
-    if (navigator.clipboard?.read) {
-      navigator.clipboard
-        .read()
-        .then((clipboardItems) => {
-          let foundImage = false;
-          for (const item of clipboardItems) {
-            const imageType = item.types.find((type) => type.startsWith('image/'));
-            if (imageType) {
-              foundImage = true;
-              e.preventDefault();
-              return item
-                .getType(imageType)
-                .then((blob) => {
-                  const file = new File([blob], `screenshot-${Date.now()}`, { type: imageType });
-                  return processFile(file);
-                })
-                .then((attachment) => {
-                  if (attachment) addScreenshotAttachment(attachment);
-                });
-            }
-          }
-          if (!foundImage) {
-            void tryTauriClipboardImage();
-          }
-        })
-        .catch(async (error) => {
-          console.warn('[PromptInput] Clipboard read failed:', error);
-          await tryTauriClipboardImage();
-        });
-    } else {
-      void tryTauriClipboardImage();
-    }
-  }, [processFile, addScreenshotAttachment]);
+      const systemImage = await readImageFromSystemClipboard();
+      if (systemImage?.dataUrl) {
+        await addPastedDataUrl(systemImage.dataUrl, systemImage.mime);
+      }
+    })();
+  }, [addPastedAttachment, addPastedDataUrl, readImageFromClipboardApi, readImageFromSystemClipboard]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter to send (without Shift)
