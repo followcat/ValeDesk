@@ -20,6 +20,7 @@ export type Session = {
   model?: string;
   temperature?: number;
   threadId?: string; // Thread ID for multi-thread sessions
+  enableSessionGitRepo?: boolean; // Per-session override for git versioning
   fileChanges?: FileChange[];
   pendingPermissions: Map<string, PendingPermission>;
   abortController?: AbortController;
@@ -42,6 +43,7 @@ export type StoredSession = {
   updatedAt: number;
   inputTokens?: number;
   outputTokens?: number;
+  enableSessionGitRepo?: boolean; // Per-session git versioning setting
   fileChanges?: FileChange[];
 };
 
@@ -79,7 +81,7 @@ export class SessionStore {
     this.loadSessions();
   }
 
-  createSession(options: { cwd?: string; allowedTools?: string; prompt?: string; title: string; model?: string; threadId?: string; temperature?: number }): Session {
+  createSession(options: { cwd?: string; allowedTools?: string; prompt?: string; title: string; model?: string; threadId?: string; temperature?: number; enableSessionGitRepo?: boolean }): Session {
     const id = crypto.randomUUID();
     const now = Date.now();
     const session: Session = {
@@ -92,14 +94,15 @@ export class SessionStore {
       model: options.model,
       temperature: options.temperature,
       threadId: options.threadId,
+      enableSessionGitRepo: options.enableSessionGitRepo,
       pendingPermissions: new Map()
     };
     this.sessions.set(id, session);
     this.db
       .prepare(
         `insert into sessions
-          (id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, enable_session_git_repo, created_at, updated_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -111,6 +114,7 @@ export class SessionStore {
         session.lastPrompt ?? null,
         session.model ?? null,
         session.threadId ?? null,
+        session.enableSessionGitRepo !== undefined ? (session.enableSessionGitRepo ? 1 : 0) : null,
         now,
         now
       );
@@ -134,7 +138,7 @@ export class SessionStore {
     // Try to load from database
     const row = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id
+        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, enable_session_git_repo
          from sessions
          where id = ?`
       )
@@ -155,6 +159,7 @@ export class SessionStore {
       lastPrompt: row.last_prompt ? String(row.last_prompt) : undefined,
       model: row.model ? String(row.model) : undefined,
       threadId: row.thread_id ? String(row.thread_id) : undefined,
+      enableSessionGitRepo: row.enable_session_git_repo !== null ? Boolean(row.enable_session_git_repo) : undefined,
       pendingPermissions: new Map()
     };
     this.sessions.set(session.id, session);
@@ -164,7 +169,7 @@ export class SessionStore {
   listSessions(): StoredSession[] {
     const rows = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, is_pinned, created_at, updated_at, input_tokens, output_tokens
+        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, is_pinned, created_at, updated_at, input_tokens, output_tokens, enable_session_git_repo
          from sessions
          order by updated_at desc`
       )
@@ -183,7 +188,8 @@ export class SessionStore {
       createdAt: Number(row.created_at),
       updatedAt: Number(row.updated_at),
       inputTokens: row.input_tokens ? Number(row.input_tokens) : undefined,
-      outputTokens: row.output_tokens ? Number(row.output_tokens) : undefined
+      outputTokens: row.output_tokens ? Number(row.output_tokens) : undefined,
+      enableSessionGitRepo: row.enable_session_git_repo !== null ? Boolean(row.enable_session_git_repo) : undefined
     }));
   }
 
@@ -718,12 +724,19 @@ export class SessionStore {
     } catch (e) {
       // Column already exists, ignore
     }
+
+    // Migration: Add enable_session_git_repo column if it doesn't exist
+    try {
+      this.db.exec(`alter table sessions add column enable_session_git_repo integer`);
+    } catch (e) {
+      // Column already exists, ignore
+    }
   }
 
   private loadSessions(): void {
     const rows = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id
+        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, enable_session_git_repo
          from sessions`
       )
       .all();
@@ -738,6 +751,7 @@ export class SessionStore {
         lastPrompt: row.last_prompt ? String(row.last_prompt) : undefined,
         model: row.model ? String(row.model) : undefined,
         threadId: row.thread_id ? String(row.thread_id) : undefined,
+        enableSessionGitRepo: row.enable_session_git_repo !== null ? Boolean(row.enable_session_git_repo) : undefined,
         pendingPermissions: new Map()
       };
       this.sessions.set(session.id, session);
