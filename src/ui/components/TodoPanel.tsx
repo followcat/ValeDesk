@@ -80,7 +80,8 @@ export function TodoPanel({
       lines_added: change.additions,
       lines_removed: change.deletions,
       content_old: undefined,
-      content_new: undefined
+      content_new: undefined,
+      commitHash: change.commitHash
     };
   };
 
