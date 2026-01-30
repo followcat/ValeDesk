@@ -2,15 +2,15 @@
  * Git utilities for tracking and rolling back file changes
  */
 
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 
 /**
  * Check if current directory is a git repository
  */
 export function isGitRepo(cwd: string): boolean {
   try {
-    execSync("git rev-parse --git-dir", { cwd, stdio: "ignore" });
-    return true;
+    const result = spawnSync("git", ["rev-parse", "--git-dir"], { cwd, stdio: "ignore" });
+    return result.status === 0;
   } catch {
     return false;
   }
