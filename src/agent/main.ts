@@ -363,11 +363,22 @@ app.on("ready", () => {
     }
   });
 
+  const resolvePathWithin = async (baseDir: string, unsafePath: string): Promise<string> => {
+    const { resolve, relative, isAbsolute, join } = await import("path");
+    const base = resolve(baseDir);
+    const target = resolve(join(base, unsafePath));
+    const rel = relative(base, target);
+    if (!rel || rel.startsWith("..") || isAbsolute(rel)) {
+      throw new Error(`[path] Refusing to access path outside base dir: ${unsafePath}`);
+    }
+    return target;
+  };
+
   // Helper function to get file snapshot
   async function getFileSnapshot(filePath: string, cwd: string): Promise<string> {
-    const { join } = await import("path");
-    const snapshotPath = join(cwd, ".valedesk", "snapshots", filePath);
-    
+    const snapshotsDir = await resolvePathWithin(cwd, ".valedesk/snapshots");
+    const snapshotPath = await resolvePathWithin(snapshotsDir, filePath);
+
     try {
       const content = await fs.readFile(snapshotPath, "utf-8");
       return content;
@@ -393,13 +404,14 @@ app.on("ready", () => {
   // Handle save file snapshot
   ipcMainHandle("save-file-snapshot", async (_, filePath: string, cwd: string, content: string) => {
     try {
-      const { join, dirname } = await import("path");
-      const snapshotPath = join(cwd, ".valedesk", "snapshots", filePath);
-      
+      const { dirname } = await import("path");
+      const snapshotsDir = await resolvePathWithin(cwd, ".valedesk/snapshots");
+      const snapshotPath = await resolvePathWithin(snapshotsDir, filePath);
+
       // Create parent directory if it doesn't exist
       const snapshotDir = dirname(snapshotPath);
       await fs.mkdir(snapshotDir, { recursive: true });
-      
+
       // Save the content
       await fs.writeFile(snapshotPath, content, "utf-8");
     } catch (error: any) {
@@ -411,7 +423,7 @@ app.on("ready", () => {
   // Handle get file new content (current file)
   ipcMainHandle("get-file-new-content", async (_, filePath: string, cwd: string) => {
     try {
-      const fullPath = resolve(cwd, filePath);
+      const fullPath = await resolvePathWithin(cwd, filePath);
       const content = await fs.readFile(fullPath, "utf-8");
       return content;
     } catch (error: any) {
