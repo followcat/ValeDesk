@@ -6,6 +6,7 @@ export interface ChangedFile {
   lines_removed: number;
   content_old?: string;
   content_new?: string;
+  commitHash?: string;
 }
 
 export interface ChangedFilesProps {

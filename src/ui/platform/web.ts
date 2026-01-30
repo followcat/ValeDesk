@@ -51,6 +51,14 @@ export function createWebPlatform(): PlatformAdapter {
                 ] as TResult;
             }
 
+            if (channel === "check-git-available") {
+                return false as TResult;
+            }
+
+            if (channel === "get-file-content-at-commit") {
+                return "" as TResult;
+            }
+
             return null as TResult;
         },
 

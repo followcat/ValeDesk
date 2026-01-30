@@ -103,6 +103,7 @@ const SessionResult = ({ message, fileChanges, sessionId, onConfirmChanges, onRo
     // FileChange currently only tracks path + line counts; no diff content available here.
     content_old: undefined,
     content_new: undefined,
+    commitHash: fc.commitHash
   }));
 
   const handleViewDiff = (file: ChangedFile) => {

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from "electron";
+import { spawnSync } from "child_process";
 import { ipcMainHandle, isDev, DEV_PORT } from "./util.js";
 import { getPreloadPath, getUIPath, getIconPath } from "./pathResolver.js";
 import { getStaticData, pollResources } from "./test.js";
@@ -419,6 +420,19 @@ app.on("ready", () => {
     }
   });
 
+  ipcMainHandle("get-file-content-at-commit", async (_, filePath: string, cwd: string, commit: string) => {
+    try {
+      const result = spawnSync("git", ["show", `${commit}:${filePath}`], { cwd, encoding: "utf8" });
+      if (result.status === 0) {
+        return result.stdout?.toString() ?? "";
+      }
+      return "";
+    } catch (error: any) {
+      console.error(`[Main] Failed to get commit content for ${filePath}:`, error);
+      throw error;
+    }
+  });
+
   // Handle get build info
   ipcMainHandle("get-build-info", async () => {
     try {
@@ -451,6 +465,16 @@ app.on("ready", () => {
           buildTime: "unknown",
         };
       }
+    }
+  });
+
+  ipcMainHandle("check-git-available", async () => {
+    try {
+      const result = spawnSync("git", ["--version"], { stdio: "ignore" });
+      return result.status === 0;
+    } catch (error: any) {
+      console.error("[Main] Failed to check git availability:", error);
+      return false;
     }
   });
 

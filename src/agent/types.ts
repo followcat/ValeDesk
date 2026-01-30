@@ -44,6 +44,7 @@ export type ApiSettings = {
   //   {conversationDataDir}/{sessionId}
   // as their working directory for file I/O.
   conversationDataDir?: string;
+  enableSessionGitRepo?: boolean; // Initialize a git repo in session folders when available
 };
 
 export type ModelInfo = {
@@ -134,6 +135,7 @@ export interface FileChange {
   additions: number;         // Number of lines added
   deletions: number;         // Number of lines deleted
   status: ChangeStatus;      // 'pending' = can be rolled back, 'confirmed' = cannot rollback
+  commitHash?: string;       // Commit hash for showing commit-level diffs
 }
 
 // Thread info for listing threads in a session

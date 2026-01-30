@@ -578,6 +578,8 @@ pub struct FileChange {
     pub deletions: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commit_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -656,6 +658,8 @@ pub struct ApiSettings {
     pub enable_memory: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_todos: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_session_git_repo: Option<bool>,
     // Add other settings as needed
 }
 

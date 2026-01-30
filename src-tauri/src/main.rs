@@ -774,6 +774,15 @@ fn write_memory(content: String) -> Result<(), String> {
   fs::write(&path, content).map_err(|error| format!("[write_memory] Failed to write {}: {error}", path.display()))
 }
 
+#[tauri::command]
+fn check_git_available() -> Result<bool, String> {
+  Command::new("git")
+    .arg("--version")
+    .output()
+    .map(|output| output.status.success())
+    .map_err(|error| format!("[check_git_available] Failed to run git: {error}"))
+}
+
 #[derive(serde::Deserialize)]
 struct GetFileContentParams {
   #[serde(rename = "filePath")]
@@ -793,6 +802,14 @@ struct SaveFileSnapshotParams {
   file_path: String,
   cwd: String,
   content: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GetFileContentAtCommitParams {
+  #[serde(rename = "filePath")]
+  file_path: String,
+  cwd: String,
+  commit: String,
 }
 
 #[tauri::command]
@@ -857,6 +874,23 @@ fn get_file_old_content(params: GetFileContentParams) -> Result<String, String> 
       use_git: false,
     })
   }
+}
+
+#[tauri::command]
+fn get_file_content_at_commit(params: GetFileContentAtCommitParams) -> Result<String, String> {
+  let spec = format!("{}:{}", params.commit, params.file_path);
+  let output = Command::new("git")
+    .args(&["show", &spec])
+    .current_dir(&params.cwd)
+    .output()
+    .map_err(|e| format!("[get_file_content_at_commit] Failed to run git: {e}"))?;
+
+  if !output.status.success() {
+    return Ok(String::new());
+  }
+
+  String::from_utf8(output.stdout)
+    .map_err(|e| format!("[get_file_content_at_commit] Failed to decode git output: {e}"))
 }
 
 #[tauri::command]
@@ -2077,10 +2111,12 @@ fn main() {
       write_memory,
       read_clipboard_image,
       get_default_conversations_dir,
+      check_git_available,
       get_file_old_content,
       get_file_new_content,
       get_file_snapshot,
       save_file_snapshot,
+      get_file_content_at_commit,
       open_external_url,
       open_path_in_finder,
       open_file,

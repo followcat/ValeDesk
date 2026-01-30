@@ -97,6 +97,24 @@ export function DiffViewerModal({ file, files = [], cwd, open, onClose, onFileCh
       setNewContent("");
       
       try {
+        if (file.commitHash) {
+          const oldContentValue = await getPlatform().invoke<string>(
+            "get-file-content-at-commit",
+            file.file_path,
+            cwd,
+            `${file.commitHash}^`
+          );
+          const newContentValue = await getPlatform().invoke<string>(
+            "get-file-content-at-commit",
+            file.file_path,
+            cwd,
+            file.commitHash
+          );
+          setOldContent(oldContentValue);
+          setNewContent(newContentValue);
+          return;
+        }
+
         // Get old content based on settings
         let oldContentValue = "";
         

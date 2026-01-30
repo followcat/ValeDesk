@@ -1,8 +1,10 @@
 import readline from "node:readline";
 import crypto from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import type { ClientEvent, Attachment, ApiSettings } from "../ui/types.js";
+import type { FileChange } from "../agent/types.js";
 import type { ServerEvent } from "../agent/types.js";
 import type { SidecarInboundMessage, SidecarOutboundMessage } from "./protocol.js";
 
@@ -55,6 +57,253 @@ function selectRunner(model: string | undefined) {
     return runClaudeSDK;
   }
   return runOpenAI;
+}
+
+const SESSION_GITIGNORE = `# Ignore everything by default
+*
+
+# Allow directories
+!*/
+
+# Session internals
+/.valedesk/
+
+# Keep gitignore and common config
+!.gitignore
+!.gitattributes
+!.editorconfig
+!.gitmodules
+!.npmrc
+!.nvmrc
+!.node-version
+!.python-version
+!.tool-versions
+!.prettierrc*
+!.eslintrc*
+!.eslintignore
+!.stylelintrc*
+!.stylelintignore
+!.babelrc*
+!.env.example
+!.env.sample
+!.env.template
+
+# Common docs/license files
+!README*
+!LICENSE*
+!CHANGELOG*
+!CONTRIBUTING*
+!Makefile
+!Dockerfile
+!CMakeLists.txt
+
+# Common text/data
+!*.txt
+!*.md
+!*.rst
+!*.adoc
+!*.tex
+!*.csv
+!*.tsv
+!*.json
+!*.jsonl
+!*.yml
+!*.yaml
+!*.toml
+!*.ini
+!*.cfg
+!*.conf
+!*.properties
+!*.xml
+!*.html
+!*.htm
+!*.css
+!*.scss
+!*.less
+!*.svg
+!*.sql
+
+# Common code files
+!*.ts
+!*.tsx
+!*.js
+!*.jsx
+!*.mjs
+!*.cjs
+!*.py
+!*.pyi
+!*.java
+!*.kt
+!*.kts
+!*.scala
+!*.go
+!*.rs
+!*.c
+!*.h
+!*.cpp
+!*.hpp
+!*.cc
+!*.hh
+!*.cs
+!*.fs
+!*.fsx
+!*.vb
+!*.php
+!*.rb
+!*.swift
+!*.m
+!*.mm
+!*.lua
+!*.pl
+!*.pm
+!*.r
+!*.sh
+!*.bash
+!*.zsh
+!*.ps1
+!*.psm1
+!*.psd1
+!*.bat
+!*.cmd
+!*.gradle
+!*.graphql
+!*.gql
+!*.proto
+`;
+
+function isGitAvailable(): boolean {
+  try {
+    const result = spawnSync("git", ["--version"], { stdio: "ignore" });
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+function writeSessionGitignore(cwd: string) {
+  const gitignorePath = join(cwd, ".gitignore");
+  if (existsSync(gitignorePath)) return;
+  try {
+    writeFileSync(gitignorePath, SESSION_GITIGNORE, "utf8");
+  } catch (error) {
+    console.warn("[sidecar] Failed to write session .gitignore:", error);
+  }
+}
+
+function ensureGitIdentity(cwd: string) {
+  try {
+    const name = spawnSync("git", ["config", "user.name"], { cwd, encoding: "utf8" }).stdout?.toString().trim();
+    if (!name) {
+      spawnSync("git", ["config", "user.name", "ValeDesk"], { cwd, stdio: "ignore" });
+    }
+    const email = spawnSync("git", ["config", "user.email"], { cwd, encoding: "utf8" }).stdout?.toString().trim();
+    if (!email) {
+      spawnSync("git", ["config", "user.email", "valedesk@local"], { cwd, stdio: "ignore" });
+    }
+  } catch (error) {
+    console.warn("[sidecar] Failed to ensure git identity:", error);
+  }
+}
+
+function commitSessionChanges(sessionId: string) {
+  const session = sessions.getSession(sessionId);
+  const cwd = session?.cwd;
+  if (!cwd || !cwd.trim()) return;
+
+  let settings: ApiSettings | null = null;
+  try {
+    settings = loadApiSettings();
+  } catch (error) {
+    console.warn("[sidecar] Failed to load settings for auto-commit:", error);
+    return;
+  }
+
+  if (!settings?.enableSessionGitRepo) return;
+  if (!isGitAvailable()) return;
+  if (!gitUtils.isGitRepo(cwd)) return;
+
+  try {
+    const status = spawnSync("git", ["status", "--porcelain"], { cwd, encoding: "utf8" }).stdout?.toString().trim();
+    if (!status) return;
+
+    ensureGitIdentity(cwd);
+    spawnSync("git", ["add", "-A"], { cwd, stdio: "ignore" });
+    const message = `session ${sessionId} turn ${new Date().toISOString()}`;
+    const commitResult = spawnSync("git", ["commit", "-m", message], { cwd, stdio: "ignore" });
+    if (commitResult.status !== 0) {
+      console.warn("[sidecar] Auto-commit failed for session:", sessionId);
+      return;
+    }
+
+    const commitHash = spawnSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" }).stdout?.toString().trim();
+    if (!commitHash) return;
+
+    const parentHash = spawnSync("git", ["rev-parse", `${commitHash}^`], { cwd, encoding: "utf8" });
+    const hasParent = parentHash.status === 0;
+    const diffArgs = hasParent
+      ? ["diff", "--numstat", `${commitHash}^`, commitHash]
+      : ["show", "--numstat", "--format=", commitHash];
+    const diffOutput = spawnSync("git", diffArgs, { cwd, encoding: "utf8" }).stdout?.toString() || "";
+
+    const fileChanges: FileChange[] = diffOutput
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [addRaw, delRaw, ...pathParts] = line.split(/\s+/);
+        const rawPath = pathParts.join(" ");
+        const normalizedPath = rawPath.includes("=>")
+          ? rawPath.replace(/\{[^}]*=>\s*([^}]+)\}/g, "$1").split("=>").pop()!.trim()
+          : rawPath.trim();
+        const additions = addRaw === "-" ? 0 : parseInt(addRaw, 10) || 0;
+        const deletions = delRaw === "-" ? 0 : parseInt(delRaw, 10) || 0;
+        return {
+          path: normalizedPath,
+          additions,
+          deletions,
+          status: "confirmed",
+          commitHash
+        };
+      });
+
+    if (fileChanges.length > 0) {
+      sessions.saveFileChanges(sessionId, fileChanges);
+      emit({
+        type: "file_changes.updated",
+        payload: { sessionId, fileChanges }
+      } as any);
+    }
+  } catch (error) {
+    console.warn("[sidecar] Auto-commit error:", error);
+  }
+}
+
+function ensureSessionGitRepo(cwd?: string) {
+  if (!cwd || !cwd.trim()) return;
+
+  let settings: ApiSettings | null = null;
+  try {
+    settings = loadApiSettings();
+  } catch (error) {
+    console.warn("[sidecar] Failed to load settings for session git repo:", error);
+    return;
+  }
+
+  if (!settings?.enableSessionGitRepo) return;
+  if (!isGitAvailable()) {
+    console.warn("[sidecar] Git not available; skipping session repo init");
+    return;
+  }
+
+  if (gitUtils.isGitRepo(cwd)) return;
+
+  const initResult = spawnSync("git", ["init"], { cwd, stdio: "ignore" });
+  if (initResult.status !== 0) {
+    console.warn("[sidecar] Failed to init git repo in session directory:", cwd);
+  } else {
+    writeSessionGitignore(cwd);
+    console.log("[sidecar] Initialized git repo in session directory:", cwd);
+  }
 }
 
 function checkAndUpdateMultiThreadTaskStatus(sessionId: string) {
@@ -195,6 +444,10 @@ function emitAndPersist(event: ServerEvent) {
     }
 
     checkAndUpdateMultiThreadTaskStatus(event.payload.sessionId);
+
+    if (event.payload.status === "completed") {
+      commitSessionChanges(event.payload.sessionId);
+    }
   }
 
   if (event.type === "stream.message") {
@@ -315,6 +568,8 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
       // Ignore; fall back to no-workspace mode
     }
   }
+
+  ensureSessionGitRepo(resolvedCwd);
 
   const session = sessions.createSession({
     id: forcedSessionId,
@@ -439,6 +694,7 @@ function handleSessionPin(event: Extract<ClientEvent, { type: "session.pin" }>) 
 function handleSessionUpdateCwd(event: Extract<ClientEvent, { type: "session.update-cwd" }>) {
   const { sessionId, cwd } = event.payload;
   sessions.updateSession(sessionId, { cwd });
+  ensureSessionGitRepo(cwd);
   const session = sessions.getSession(sessionId);
   if (!session) return;
   emit({
@@ -1114,4 +1370,3 @@ rl.on("line", (line) => {
     process.exit(1);
   });
 });
-

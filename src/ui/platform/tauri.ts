@@ -137,6 +137,9 @@ export function createTauriPlatform(): PlatformAdapter {
           const path = String(args[0] ?? "");
           return tauriInvoke("open_path_in_finder", { path });
         }
+        case "check-git-available": {
+          return tauriInvoke("check_git_available");
+        }
         case "get-file-old-content": {
           const filePath = String(args[0] ?? "");
           const cwd = String(args[1] ?? "");
@@ -171,6 +174,18 @@ export function createTauriPlatform(): PlatformAdapter {
             params: {
               filePath, 
               cwd 
+            }
+          });
+        }
+        case "get-file-content-at-commit": {
+          const filePath = String(args[0] ?? "");
+          const cwd = String(args[1] ?? "");
+          const commit = String(args[2] ?? "");
+          return tauriInvoke("get_file_content_at_commit", {
+            params: {
+              filePath,
+              cwd,
+              commit
             }
           });
         }
@@ -210,4 +225,3 @@ export function createTauriPlatform(): PlatformAdapter {
     },
   };
 }
-
