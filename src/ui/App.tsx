@@ -514,7 +514,7 @@ function App() {
                   permissionRequest={permissionRequests[0]}
                   onPermissionResult={handlePermissionResult}
                   onEditMessage={handleEditMessage}
-                  fileChanges={activeSession?.fileChanges}
+                  fileChanges={activeSession?.fileChangesByMessage?.[idx]?.length ? activeSession?.fileChangesByMessage?.[idx] : undefined}
                   sessionId={activeSessionId || undefined}
                   onConfirmChanges={handleConfirmChanges}
                   onRollbackChanges={handleRollbackChanges}

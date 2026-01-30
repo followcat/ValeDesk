@@ -64,12 +64,9 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
       // Starting new session - can be empty for chat-only mode
       setPendingStart(true);
       
-      // Generate title from first 3 words of prompt
+      // Keep default title so backend can auto-generate when prompt exists
       let title = "New Chat";
-      if (trimmedPrompt) {
-        const words = trimmedPrompt.split(/\s+/).slice(0, 3);
-        title = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
-      } else if (attachments.length > 0) {
+      if (!trimmedPrompt && attachments.length > 0) {
         title = `Attachment: ${attachments[0].name}`;
       }
       sendEvent({
