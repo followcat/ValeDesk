@@ -49,11 +49,12 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
   const sendTemperature = useAppStore((state) => state.sendTemperature);
   const attachments = useAppStore((state) => state.attachments);
   const clearAttachments = useAppStore((state) => state.clearAttachments);
+  const apiSettings = useAppStore((state) => state.apiSettings);
 
   const activeSession = activeSessionId ? sessions[activeSessionId] : undefined;
   const isRunning = activeSession?.status === "running";
 
-  const handleSend = useCallback(async () => {
+  const handleSend = useCallback(async (options?: { enableSessionGitRepo?: boolean }) => {
     const trimmedPrompt = prompt.trim();
 
     // For existing sessions, require a prompt or attachments
@@ -80,6 +81,7 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
           allowedTools: DEFAULT_ALLOWED_TOOLS,
           model: selectedModel || undefined,
           temperature: sendTemperature ? selectedTemperature : undefined,
+          enableSessionGitRepo: options?.enableSessionGitRepo ?? apiSettings?.enableSessionGitRepo ?? false,
           attachments: attachments.length > 0 ? attachments : undefined
         }
       });
@@ -114,17 +116,17 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
     }
     setPrompt("");
     clearAttachments();
-  }, [activeSession, activeSessionId, cwd, prompt, sendEvent, setGlobalError, setPendingStart, setPrompt, selectedModel, selectedTemperature, sendTemperature, attachments, clearAttachments]);
+  }, [activeSession, activeSessionId, cwd, prompt, sendEvent, setGlobalError, setPendingStart, setPrompt, selectedModel, selectedTemperature, sendTemperature, attachments, clearAttachments, apiSettings?.enableSessionGitRepo]);
 
   const handleStop = useCallback(() => {
     if (!activeSessionId) return;
     sendEvent({ type: "session.stop", payload: { sessionId: activeSessionId } });
   }, [activeSessionId, sendEvent]);
 
-  const handleStartFromModal = useCallback(() => {
+  const handleStartFromModal = useCallback((options?: { enableSessionGitRepo?: boolean }) => {
     // Allow starting chat without cwd or prompt
     // If no cwd, file operations will be blocked by tools-executor
-    handleSend();
+    handleSend(options);
   }, [handleSend]);
 
   return { prompt, setPrompt, isRunning, handleSend, handleStop, handleStartFromModal };

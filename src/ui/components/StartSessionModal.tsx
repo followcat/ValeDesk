@@ -10,7 +10,7 @@ interface StartSessionModalProps {
   pendingStart: boolean;
   onCwdChange: (value: string) => void;
   onPromptChange: (value: string) => void;
-  onStart: () => void;
+  onStart: (options?: { enableSessionGitRepo?: boolean }) => void;
   onClose: () => void;
   apiSettings: ApiSettings | null;
   availableModels: Array<{ id: string; name: string; description?: string }>;
@@ -47,6 +47,7 @@ export function StartSessionModal({
   const schedulerDefaultSendTemperature = useAppStore((s) => s.schedulerDefaultSendTemperature);
   const [recentCwds, setRecentCwds] = useState<string[]>([]);
   const [modelSearch, setModelSearch] = useState('');
+  const [enableSessionGitRepo, setEnableSessionGitRepo] = useState<boolean>(apiSettings?.enableSessionGitRepo ?? false);
 
   useEffect(() => {
     getPlatform()
@@ -56,6 +57,10 @@ export function StartSessionModal({
         console.error("[StartSessionModal] getRecentCwds failed", { error });
       });
   }, []);
+
+  useEffect(() => {
+    setEnableSessionGitRepo(apiSettings?.enableSessionGitRepo ?? false);
+  }, [apiSettings?.enableSessionGitRepo]);
 
   // Show only enabled models from settings.
   // If no LLM models are configured, fall back to legacy API models.
@@ -316,7 +321,7 @@ export function StartSessionModal({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !pendingStart) {
                   e.preventDefault();
-                  onStart();
+                  onStart({ enableSessionGitRepo });
                 }
               }}
             />
@@ -324,9 +329,27 @@ export function StartSessionModal({
               Press <span className="font-medium text-ink-700">{typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘ + Enter' : 'Ctrl + Enter'}</span> to start
             </div>
           </label>
+
+          <label className="flex items-center justify-between rounded-xl border border-ink-900/10 bg-surface px-4 py-3">
+            <div className="grid gap-0.5">
+              <div className="text-sm font-medium text-ink-800">文件跟进 / 自动 Git 版本</div>
+              <div className="text-[11px] text-muted-light">在本 Session 目录里自动 git init + 自动提交变更，用于基于 commit 的 diff</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEnableSessionGitRepo(!enableSessionGitRepo)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enableSessionGitRepo ? 'bg-accent' : 'bg-ink-900/15'}`}
+              aria-pressed={enableSessionGitRepo}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${enableSessionGitRepo ? 'translate-x-5' : 'translate-x-1'}`}
+              />
+            </button>
+          </label>
+
           <button
             className="flex flex-col items-center rounded-full bg-accent px-5 py-3 text-sm font-medium text-white shadow-soft hover:bg-accent-hover transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={onStart}
+            onClick={() => onStart({ enableSessionGitRepo })}
             disabled={pendingStart}
           >
             {pendingStart ? (
