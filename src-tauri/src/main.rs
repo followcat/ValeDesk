@@ -878,6 +878,17 @@ fn get_file_old_content(params: GetFileContentParams) -> Result<String, String> 
 
 #[tauri::command]
 fn get_file_content_at_commit(params: GetFileContentAtCommitParams) -> Result<String, String> {
+  let is_valid_commit = params.commit.len() >= 7
+    && params.commit.len() <= 64
+    && params
+      .commit
+      .chars()
+      .all(|c| c.is_ascii_hexdigit());
+
+  if !is_valid_commit {
+    return Ok(String::new());
+  }
+
   let spec = format!("{}:{}", params.commit, params.file_path);
   let output = Command::new("git")
     .args(&["show", &spec])

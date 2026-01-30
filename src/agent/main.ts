@@ -423,8 +423,12 @@ app.on("ready", () => {
     }
   });
 
+  const isValidCommit = (commit: string) => /^[0-9a-f]{7,64}$/i.test(commit);
+
   ipcMainHandle("get-file-content-at-commit", async (_, filePath: string, cwd: string, commit: string) => {
     try {
+      if (!isValidCommit(commit)) return "";
+
       const result = spawnSync("git", ["show", `${commit}:${filePath}`], { cwd, encoding: "utf8" });
       if (result.status === 0) {
         return result.stdout?.toString() ?? "";
