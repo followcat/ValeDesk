@@ -46,6 +46,9 @@ type EventPayloadMapping = {
     "get-file-new-content": string;
     "get-file-content-at-commit": string;
     "check-git-available": boolean;
+    "save-pasted-image": { path: string; name: string; mime: string; size: number };
+    "get-image-preview": { dataUrl: string; mime: string };
+    "read-clipboard-image": { dataUrl: string; mime: string } | null;
 }
 
 interface Window {
@@ -58,6 +61,9 @@ interface Window {
         generateSessionTitle: (userInput: string | null) => Promise<string>;
         getRecentCwds: (limit?: number) => Promise<string[]>;
         selectDirectory: () => Promise<string | null>;
+        savePastedImage: (payload: { dataUrl: string; cwd: string; fileName?: string }) => Promise<{ path: string; name: string; mime: string; size: number }>;
+        getImagePreview: (payload: { cwd: string; path: string; maxSize?: number }) => Promise<{ dataUrl: string; mime: string }>;
+        readClipboardImage: () => Promise<{ dataUrl: string; mime: string } | null>;
         // File browser APIs
         invoke: (channel: string, ...args: any[]) => Promise<any>;
         send: (channel: string, ...args: any[]) => void;

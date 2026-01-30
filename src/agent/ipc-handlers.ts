@@ -591,8 +591,9 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
     // Subscribe this window to the session
     sessionManager.setWindowSession(windowId, session.id);
 
+    const hasAttachments = Boolean(event.payload.attachments && event.payload.attachments.length > 0);
+
     // If prompt is empty and no attachments, just create session without running AI
-    const hasAttachments = event.payload.attachments && event.payload.attachments.length > 0;
     if ((!event.payload.prompt || event.payload.prompt.trim() === '') && !hasAttachments) {
       sessions.updateSession(session.id, {
         status: "idle",
@@ -625,12 +626,12 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       prompt: event.payload.prompt,
       session,
       resumeSessionId: session.claudeSessionId,
+      attachments: event.payload.attachments,
       onEvent: emit,
       onSessionUpdate: (updates) => {
         sessions.updateSession(session.id, updates);
-      },
-      attachments: event.payload.attachments
-    })
+      }
+    });
       .then((handle) => {
         runnerHandles.set(session.id, handle);
         sessions.setAbortController(session.id, undefined);
@@ -688,7 +689,8 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
         });
     }
 
-    const isSamePrompt = session.lastPrompt === event.payload.prompt;
+    const hasAttachments = Boolean(event.payload.attachments && event.payload.attachments.length > 0);
+    const isSamePrompt = session.lastPrompt === event.payload.prompt && !hasAttachments;
     sessions.updateSession(session.id, { status: "running", lastPrompt: event.payload.prompt });
     sessionManager.emitToWindow(windowId, {
       type: "session.status",
@@ -720,6 +722,7 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       prompt: event.payload.prompt,
       session,
       resumeSessionId: isFirstRun ? undefined : session.claudeSessionId,
+      attachments: event.payload.attachments,
       onEvent: emit,
       onSessionUpdate: (updates) => {
         sessions.updateSession(session.id, updates);

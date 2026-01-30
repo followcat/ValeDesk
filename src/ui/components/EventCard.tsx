@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useAppStore } from "../store/useAppStore";
 import type {
   PermissionResult,
   SDKAssistantMessage,
@@ -8,7 +9,6 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { StreamMessage, Attachment, FileChange } from "../types";
 import type { PermissionRequest } from "../store/useAppStore";
-import { useAppStore } from "../store/useAppStore";
 import MDContent from "../render/markdown";
 import { getPlatform } from "../platform";
 import { DecisionPanel } from "./DecisionPanel";
@@ -645,8 +645,9 @@ const ImageZoomModal = ({
 
 // Attachment preview for displaying attached files in user messages
 /** Renders attached media (image, video, audio) in user messages */
-const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
+const AttachmentDisplay = ({ attachment, cwd }: { attachment: Attachment; cwd?: string }) => {
   const [isZoomed, setIsZoomed] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(attachment.dataUrl || null);
 
   const toObjectUrl = (dataUrl: string, fallbackMimeType: string) => {
     const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -662,25 +663,61 @@ const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
     return URL.createObjectURL(new Blob([bytes], { type: mime }));
   };
   
+  useEffect(() => {
+    if (attachment.type !== 'image') return;
+    if (attachment.dataUrl) {
+      setImagePreview(attachment.dataUrl);
+      return;
+    }
+    if (!attachment.path || !cwd) return;
+    const electron = (window as any).electron;
+    if (!electron?.getImagePreview) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const preview = await electron.getImagePreview({ cwd, path: attachment.path });
+        if (!cancelled && preview?.dataUrl) {
+          setImagePreview(preview.dataUrl);
+        }
+      } catch (error) {
+        console.warn('[AttachmentDisplay] Failed to load image preview:', error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachment.type, attachment.dataUrl, attachment.path, cwd]);
+
   if (attachment.type === 'image') {
+    const imageSrc = imagePreview || attachment.dataUrl;
     return (
       <>
         <div className="mt-2">
-          <img
-            src={attachment.dataUrl}
-            alt={`Attached image: ${attachment.name}`}
-            className="max-w-xs max-h-48 rounded-lg object-contain cursor-zoom-in hover:opacity-90 transition-opacity"
-            onDoubleClick={() => setIsZoomed(true)}
-            title="Double-click to zoom"
-          />
+          {imageSrc ? (
+            <img
+              src={imageSrc}
+              alt={`Attached image: ${attachment.name}`}
+              className="max-w-xs max-h-48 rounded-lg object-contain cursor-zoom-in hover:opacity-90 transition-opacity"
+              onDoubleClick={() => setIsZoomed(true)}
+              title="Double-click to zoom"
+            />
+          ) : (
+            <div className="max-w-xs max-h-48 rounded-lg bg-surface-secondary border border-ink-900/10 p-3 text-xs text-muted">
+              Image preview unavailable
+            </div>
+          )}
           <div className="text-xs text-muted mt-1">{attachment.name}</div>
         </div>
-        <ImageZoomModal
-          isOpen={isZoomed}
-          onClose={() => setIsZoomed(false)}
-          imageUrl={attachment.dataUrl}
-          imageName={attachment.name}
-        />
+        {imageSrc && (
+          <ImageZoomModal
+            isOpen={isZoomed}
+            onClose={() => setIsZoomed(false)}
+            imageUrl={imageSrc}
+            imageName={attachment.name}
+          />
+        )}
       </>
     );
   }
@@ -818,15 +855,21 @@ const AttachmentDisplay = ({ attachment }: { attachment: Attachment }) => {
 const UserMessageCard = ({ 
   message, 
   showIndicator = false,
-  onEdit
+  onEdit,
+  sessionId
 }: { 
   message: { type: "user_prompt"; prompt: string; attachments?: Attachment[] }; 
   showIndicator?: boolean;
   onEdit?: (newPrompt: string) => void;
+  sessionId?: string;
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(message.prompt);
   const [copied, setCopied] = useState(false);
+  const attachments = message.attachments || [];
+  const hasPrompt = message.prompt.trim().length > 0;
+  const sessions = useAppStore((state) => state.sessions);
+  const sessionCwd = sessionId ? sessions[sessionId]?.cwd : undefined;
 
   const handleCopy = async () => {
     try {
@@ -849,6 +892,7 @@ const UserMessageCard = ({
     setEditedText(message.prompt);
     setIsEditing(false);
   };
+
 
   return (
     <div className="flex flex-col mt-4 group overflow-hidden">
@@ -881,12 +925,19 @@ const UserMessageCard = ({
         </div>
       ) : (
         <>
-          <MDContent text={message.prompt} />
-          {/* Display attachments */}
-          {message.attachments && message.attachments.length > 0 && (
+          {hasPrompt ? (
+            <MDContent text={message.prompt} />
+          ) : (
+            <div className="mt-2 text-sm text-ink-600">User attached file(s).</div>
+          )}
+          {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-2">
-              {message.attachments.map((attachment) => (
-                <AttachmentDisplay key={attachment.id} attachment={attachment} />
+              {attachments.map((attachment) => (
+                <AttachmentDisplay
+                  key={attachment.id ?? attachment.path ?? attachment.name}
+                  attachment={attachment}
+                  cwd={sessionCwd}
+                />
               ))}
             </div>
           )}
@@ -953,6 +1004,7 @@ export function MessageCard({
     return <UserMessageCard 
       message={message} 
       showIndicator={showIndicator}
+      sessionId={sessionId}
       onEdit={onEditMessage && typeof messageIndex === 'number' 
         ? (newPrompt) => onEditMessage(messageIndex, newPrompt)
         : undefined

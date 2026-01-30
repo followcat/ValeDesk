@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import type { ApiSettings, LLMModel, ClientEvent } from "../types";
+import type { ApiSettings, LLMModel, ClientEvent, Attachment } from "../types";
 import { getPlatform } from "../platform";
 import { useAppStore } from "../store/useAppStore";
 
@@ -47,6 +47,10 @@ export function StartSessionModal({
   const schedulerDefaultSendTemperature = useAppStore((s) => s.schedulerDefaultSendTemperature);
   const [recentCwds, setRecentCwds] = useState<string[]>([]);
   const [modelSearch, setModelSearch] = useState('');
+  const attachments = useAppStore((state) => state.attachments);
+  const addAttachment = useAppStore((state) => state.addAttachment);
+  const removeAttachment = useAppStore((state) => state.removeAttachment);
+  const setGlobalError = useAppStore((state) => state.setGlobalError);
 
   useEffect(() => {
     getPlatform()
@@ -115,6 +119,159 @@ export function StartSessionModal({
     const result = await getPlatform().selectDirectory();
     if (result) onCwdChange(result);
   };
+
+  const fileToAttachment = useCallback((file: File): Promise<Attachment | null> => {
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setGlobalError(`File too large: ${file.name}. Maximum size is ${Math.round(maxSize / (1024 * 1024))}MB.`);
+      return Promise.resolve(null);
+    }
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        resolve({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          type: 'image',
+          name: file.name,
+          mimeType: file.type || 'image/png',
+          dataUrl,
+          size: file.size
+        });
+      };
+      reader.onerror = () => {
+        setGlobalError(`Failed to read file: ${file.name}`);
+        resolve(null);
+      };
+      reader.readAsDataURL(file);
+    });
+  }, [setGlobalError]);
+
+  const saveImageToWorkspace = useCallback(async (attachment: Attachment, fileName?: string) => {
+    if (attachment.type !== 'image') return attachment;
+    const targetCwd = cwd?.trim();
+    if (!targetCwd) return attachment;
+    const electron = (window as any).electron;
+    if (!electron?.savePastedImage) return attachment;
+
+    try {
+      const result = await electron.savePastedImage({
+        dataUrl: attachment.dataUrl,
+        cwd: targetCwd,
+        fileName: fileName || attachment.name
+      });
+      if (result?.path) {
+        return {
+          ...attachment,
+          path: result.path,
+          name: result.name || attachment.name,
+          mimeType: result.mime || attachment.mimeType,
+          size: typeof result.size === "number" ? result.size : attachment.size
+        };
+      }
+    } catch (error) {
+      console.warn('[StartSessionModal] Failed to save pasted image:', error);
+    }
+
+    return attachment;
+  }, [cwd]);
+
+  const addPastedAttachment = useCallback(async (file: File, nameOverride?: string) => {
+    const attachment = await fileToAttachment(file);
+    if (!attachment) return;
+    const renamed = nameOverride ? { ...attachment, name: nameOverride } : attachment;
+    const saved = await saveImageToWorkspace(renamed, renamed.name);
+    addAttachment(saved);
+  }, [addAttachment, fileToAttachment, saveImageToWorkspace]);
+
+  const addPastedDataUrl = useCallback(async (dataUrl: string, mimeType?: string) => {
+    const attachment: Attachment = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      type: 'image',
+      name: `Screenshot ${new Date().toLocaleTimeString()}.png`,
+      mimeType: mimeType || 'image/png',
+      dataUrl,
+      size: 0
+    };
+    const saved = await saveImageToWorkspace(attachment, attachment.name);
+    addAttachment(saved);
+  }, [addAttachment, saveImageToWorkspace]);
+
+  const readImageFromClipboardApi = useCallback(async () => {
+    if (!navigator.clipboard?.read) return null;
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        const imageType = item.types.find((type) => type.startsWith('image/'));
+        if (!imageType) continue;
+        const blob = await item.getType(imageType);
+        return new File([blob], `screenshot-${Date.now()}`, { type: imageType });
+      }
+    } catch (error) {
+      console.warn('[StartSessionModal] Clipboard API read failed:', error);
+    }
+    return null;
+  }, []);
+
+  const readImageFromSystemClipboard = useCallback(async () => {
+    try {
+      const electron = (window as any).electron;
+      if (electron?.readClipboardImage) {
+        const result = await electron.readClipboardImage();
+        if (result?.dataUrl) return result;
+      }
+    } catch (error) {
+      console.warn('[StartSessionModal] Electron clipboard image read failed:', error);
+    }
+
+    try {
+      const tauri = (window as any).__TAURI__;
+      const invoke = tauri?.invoke || tauri?.core?.invoke;
+      if (typeof invoke === 'function') {
+        const dataUrl: string | null = await invoke('read_clipboard_image');
+        if (dataUrl) return { dataUrl, mime: 'image/png' };
+      }
+    } catch (error) {
+      console.warn('[StartSessionModal] Tauri clipboard image fallback failed:', error);
+    }
+
+    return null;
+  }, []);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (items && items.length > 0) {
+      const imageItems = Array.from(items).filter((item) => item.type.startsWith('image/'));
+      if (imageItems.length > 0) {
+        const hasText = e.clipboardData?.types?.includes("text/plain");
+        if (!hasText) e.preventDefault();
+        for (const item of imageItems) {
+          const file = item.getAsFile();
+          if (file) {
+            void addPastedAttachment(file, `Screenshot ${new Date().toLocaleTimeString()}.png`);
+          }
+        }
+        return;
+      }
+    }
+
+    const hasText = e.clipboardData?.types?.includes("text/plain");
+    if (!hasText) e.preventDefault();
+
+    void (async () => {
+      const file = await readImageFromClipboardApi();
+      if (file) {
+        await addPastedAttachment(file, `Screenshot ${new Date().toLocaleTimeString()}.png`);
+        return;
+      }
+
+      const systemImage = await readImageFromSystemClipboard();
+      if (systemImage?.dataUrl) {
+        await addPastedDataUrl(systemImage.dataUrl, systemImage.mime);
+      }
+    })();
+  }, [addPastedAttachment, addPastedDataUrl, readImageFromClipboardApi, readImageFromSystemClipboard]);
 
   // Find the selected model in the list to display its name instead of ID
   const displayModel = (() => {
@@ -307,12 +464,45 @@ export function StartSessionModal({
               <span className="text-xs font-medium text-muted">Initial Message</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-ink-100 text-ink-600 font-medium">Optional</span>
             </div>
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((attachment) => (
+                  <div
+                    key={attachment.id}
+                    className="flex items-center gap-2 rounded-lg border border-ink-900/10 bg-surface-secondary px-2.5 py-1.5 text-xs text-ink-700"
+                  >
+                    {attachment.type === 'image' ? (
+                      <img
+                        src={attachment.dataUrl}
+                        alt={attachment.name}
+                        className="h-9 w-9 rounded-md object-cover border border-ink-900/10"
+                      />
+                    ) : (
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-surface-tertiary text-[10px] text-muted">
+                        {attachment.type.toUpperCase()}
+                      </span>
+                    )}
+                    <span className="font-medium">{attachment.type}</span>
+                    <span className="truncate max-w-[220px]">{attachment.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(attachment.id)}
+                      className="text-ink-400 hover:text-error transition-colors"
+                      aria-label="Remove attachment"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <textarea
               rows={4}
               className="rounded-xl border border-ink-900/10 bg-surface-secondary p-3 text-sm text-ink-800 placeholder:text-muted-light focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20 transition-colors resize-none"
               placeholder="Leave empty to start chatting from the main input..."
               value={prompt}
               onChange={(e) => onPromptChange(e.target.value)}
+              onPaste={handlePaste}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !pendingStart) {
                   e.preventDefault();
