@@ -9,7 +9,7 @@ import { SchedulerService } from "./libs/scheduler-service.js";
 import { loadApiSettings, saveApiSettings } from "./libs/settings-store.js";
 import { generateSessionTitle } from "./libs/util.js";
 import { app } from "electron";
-import { join } from "path";
+import { join, resolve, relative } from "path";
 import { sessionManager } from "./session-manager.js";
 import * as gitUtils from "./git-utils.js";
 import type { CreateTaskPayload, ThreadTask } from "./types.js";
@@ -149,6 +149,17 @@ function isGitAvailable(): boolean {
   }
 }
 
+function isWhitelistedSessionGitCwd(cwd: string, settings: ApiSettings | null): boolean {
+  const baseDir = settings?.conversationDataDir?.trim() || join(app.getPath("userData"), "Conversations");
+  const base = resolve(baseDir);
+  const target = resolve(cwd);
+  const rel = relative(base, target);
+
+  // Allow only {base}/{sessionId} (exactly one path segment)
+  if (!rel || rel.startsWith("..") || /[\\/]/.test(rel)) return false;
+  return true;
+}
+
 function writeSessionGitignore(cwd: string) {
   const gitignorePath = join(cwd, ".gitignore");
   if (existsSync(gitignorePath)) return;
@@ -259,6 +270,10 @@ function ensureSessionGitRepo(cwd?: string) {
   }
 
   if (!settings?.enableSessionGitRepo) return;
+  if (!isWhitelistedSessionGitCwd(cwd, settings)) {
+    console.warn("[ipc] Refusing to init session git repo outside session dir:", cwd);
+    return;
+  }
   if (!isGitAvailable()) {
     console.warn("[ipc] Git not available; skipping session repo init");
     return;
