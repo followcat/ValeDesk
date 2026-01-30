@@ -487,39 +487,30 @@ app.on("ready", () => {
     try {
       if (useGit) {
         // Use git (original behavior), but fallback to snapshot if git is not available
-        const { execSync } = await import("child_process");
-        
+
         // First, check if this is a git repository
-        let isGitRepo = false;
-        try {
-          execSync("git rev-parse --git-dir", {
-            cwd,
-            encoding: "utf-8",
-            stdio: ["ignore", "pipe", "pipe"],
-          });
-          isGitRepo = true;
-        } catch {
-          // Not a git repo, fallback to snapshot
-          isGitRepo = false;
-        }
-        
-        if (!isGitRepo) {
+        const isRepo = spawnSync("git", ["rev-parse", "--git-dir"], {
+          cwd,
+          stdio: "ignore",
+        }).status === 0;
+
+        if (!isRepo) {
           // Not a git repo, fallback to snapshot
           return await getFileSnapshot(filePath, cwd);
         }
-        
+
         // Try to get file content from git HEAD
-        try {
-          const content = execSync(`git show HEAD:"${filePath}"`, {
-            cwd,
-            encoding: "utf-8",
-            stdio: ["ignore", "pipe", "pipe"],
-          });
-          return content;
-        } catch (gitError: any) {
-          // File doesn't exist in git HEAD (new file) - fallback to snapshot
-          return await getFileSnapshot(filePath, cwd);
+        const result = spawnSync("git", ["show", `HEAD:${filePath}`], {
+          cwd,
+          encoding: "utf8",
+        });
+
+        if (result.status === 0) {
+          return result.stdout?.toString() ?? "";
         }
+
+        // File doesn't exist in git HEAD (new file) - fallback to snapshot
+        return await getFileSnapshot(filePath, cwd);
       } else {
         // Use file snapshot
         return await getFileSnapshot(filePath, cwd);
@@ -530,11 +521,22 @@ app.on("ready", () => {
     }
   });
 
+  const resolvePathWithin = async (baseDir: string, unsafePath: string): Promise<string> => {
+    const { resolve, relative, isAbsolute, join } = await import("path");
+    const base = resolve(baseDir);
+    const target = resolve(join(base, unsafePath));
+    const rel = relative(base, target);
+    if (!rel || rel.startsWith("..") || isAbsolute(rel)) {
+      throw new Error(`[path] Refusing to access path outside base dir: ${unsafePath}`);
+    }
+    return target;
+  };
+
   // Helper function to get file snapshot
   async function getFileSnapshot(filePath: string, cwd: string): Promise<string> {
-    const { join } = await import("path");
-    const snapshotPath = join(cwd, ".valedesk", "snapshots", filePath);
-    
+    const snapshotsDir = await resolvePathWithin(cwd, ".valedesk/snapshots");
+    const snapshotPath = await resolvePathWithin(snapshotsDir, filePath);
+
     try {
       const content = await fs.readFile(snapshotPath, "utf-8");
       return content;
@@ -560,13 +562,14 @@ app.on("ready", () => {
   // Handle save file snapshot
   ipcMainHandle("save-file-snapshot", async (_, filePath: string, cwd: string, content: string) => {
     try {
-      const { join, dirname } = await import("path");
-      const snapshotPath = join(cwd, ".valedesk", "snapshots", filePath);
-      
+      const { dirname } = await import("path");
+      const snapshotsDir = await resolvePathWithin(cwd, ".valedesk/snapshots");
+      const snapshotPath = await resolvePathWithin(snapshotsDir, filePath);
+
       // Create parent directory if it doesn't exist
       const snapshotDir = dirname(snapshotPath);
       await fs.mkdir(snapshotDir, { recursive: true });
-      
+
       // Save the content
       await fs.writeFile(snapshotPath, content, "utf-8");
     } catch (error: any) {
@@ -578,7 +581,7 @@ app.on("ready", () => {
   // Handle get file new content (current file)
   ipcMainHandle("get-file-new-content", async (_, filePath: string, cwd: string) => {
     try {
-      const fullPath = resolve(cwd, filePath);
+      const fullPath = await resolvePathWithin(cwd, filePath);
       const content = await fs.readFile(fullPath, "utf-8");
       return content;
     } catch (error: any) {
@@ -587,8 +590,12 @@ app.on("ready", () => {
     }
   });
 
+  const isValidCommit = (commit: string) => /^[0-9a-f]{7,64}$/i.test(commit);
+
   ipcMainHandle("get-file-content-at-commit", async (_, filePath: string, cwd: string, commit: string) => {
     try {
+      if (!isValidCommit(commit)) return "";
+
       const result = spawnSync("git", ["show", `${commit}:${filePath}`], { cwd, encoding: "utf8" });
       if (result.status === 0) {
         return result.stdout?.toString() ?? "";

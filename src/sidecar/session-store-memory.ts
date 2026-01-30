@@ -25,6 +25,7 @@ export type Session = {
   model?: string;
   temperature?: number;
   threadId?: string;
+  enableSessionGitRepo?: boolean; // Per-session git versioning setting
   fileChanges?: FileChange[];
   pendingPermissions: Map<string, PendingPermission>;
   abortController?: AbortController;
@@ -47,6 +48,7 @@ export type StoredSession = {
   updatedAt: number;
   inputTokens?: number;
   outputTokens?: number;
+  enableSessionGitRepo?: boolean; // Per-session git versioning setting
   fileChanges?: FileChange[];
 };
 
@@ -91,6 +93,7 @@ export class MemorySessionStore {
     model?: string; 
     threadId?: string; 
     temperature?: number;
+    enableSessionGitRepo?: boolean;
     id?: string; // Allow external ID
   }): Session {
     const id = options.id || crypto.randomUUID();
@@ -104,6 +107,7 @@ export class MemorySessionStore {
       model: options.model,
       temperature: options.temperature,
       threadId: options.threadId,
+      enableSessionGitRepo: options.enableSessionGitRepo,
       pendingPermissions: new Map()
     };
     this.sessions.set(id, session);
@@ -117,7 +121,8 @@ export class MemorySessionStore {
       cwd: session.cwd,
       allowedTools: session.allowedTools,
       model: session.model,
-      threadId: session.threadId
+      threadId: session.threadId,
+      enableSessionGitRepo: session.enableSessionGitRepo
     });
     
     return session;

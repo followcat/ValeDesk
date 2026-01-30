@@ -9,7 +9,7 @@ import { SchedulerService } from "./libs/scheduler-service.js";
 import { loadApiSettings, saveApiSettings } from "./libs/settings-store.js";
 import { generateSessionTitle } from "./libs/util.js";
 import { app } from "electron";
-import { join } from "path";
+import { join, resolve, relative } from "path";
 import { sessionManager } from "./session-manager.js";
 import * as gitUtils from "./git-utils.js";
 import type { CreateTaskPayload, ThreadTask } from "./types.js";
@@ -149,6 +149,17 @@ function isGitAvailable(): boolean {
   }
 }
 
+function isWhitelistedSessionGitCwd(cwd: string, settings: ApiSettings | null): boolean {
+  const baseDir = settings?.conversationDataDir?.trim() || join(app.getPath("userData"), "Conversations");
+  const base = resolve(baseDir);
+  const target = resolve(cwd);
+  const rel = relative(base, target);
+
+  // Allow only {base}/{sessionId} (exactly one path segment)
+  if (!rel || rel.startsWith("..") || /[\\/]/.test(rel)) return false;
+  return true;
+}
+
 function writeSessionGitignore(cwd: string) {
   const gitignorePath = join(cwd, ".gitignore");
   if (existsSync(gitignorePath)) return;
@@ -187,7 +198,11 @@ function commitSessionChanges(sessionId: string) {
     return;
   }
 
-  if (!settings?.enableSessionGitRepo) return;
+  // Check per-session setting first, fall back to global setting
+  const enabled = session.enableSessionGitRepo !== undefined 
+    ? session.enableSessionGitRepo 
+    : (settings?.enableSessionGitRepo ?? false);
+  if (!enabled) return;
   if (!isGitAvailable()) return;
   if (!gitUtils.isGitRepo(cwd)) return;
 
@@ -246,7 +261,8 @@ function commitSessionChanges(sessionId: string) {
   }
 }
 
-function ensureSessionGitRepo(cwd?: string) {
+function ensureSessionGitRepo(session: Session) {
+  const cwd = session.cwd;
   if (!cwd || !cwd.trim()) return;
 
   let settings: ApiSettings | null = null;
@@ -257,7 +273,15 @@ function ensureSessionGitRepo(cwd?: string) {
     return;
   }
 
-  if (!settings?.enableSessionGitRepo) return;
+  // Check per-session setting first, fall back to global setting
+  const enabled = session.enableSessionGitRepo !== undefined 
+    ? session.enableSessionGitRepo 
+    : (settings?.enableSessionGitRepo ?? false);
+  if (!enabled) return;
+  if (!isWhitelistedSessionGitCwd(cwd, settings)) {
+    console.warn("[ipc] Refusing to init session git repo outside session dir:", cwd);
+    return;
+  }
   if (!isGitAvailable()) {
     console.warn("[ipc] Git not available; skipping session repo init");
     return;
@@ -583,9 +607,10 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       allowedTools: event.payload.allowedTools,
       prompt: event.payload.prompt,
       model: event.payload.model,
-      temperature: event.payload.temperature
+      temperature: event.payload.temperature,
+      enableSessionGitRepo: event.payload.enableSessionGitRepo
     });
-    ensureSessionGitRepo(session.cwd);
+    ensureSessionGitRepo(session);
 
     // Subscribe this window to the session
     sessionManager.setWindowSession(windowId, session.id);
@@ -824,9 +849,9 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
   if (event.type === "session.update-cwd") {
     const { sessionId, cwd } = event.payload;
     sessions.updateSession(sessionId, { cwd });
-    ensureSessionGitRepo(cwd);
     const session = sessions.getSession(sessionId);
     if (session) {
+      ensureSessionGitRepo(session);
       // Use emit to route only to subscribed windows
       emit({
         type: "session.status",

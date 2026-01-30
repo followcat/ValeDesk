@@ -239,7 +239,7 @@ export type CreateTaskPayload = {
 
 // Client -> Server events
 export type ClientEvent =
-  | { type: "session.start"; payload: { title: string; prompt: string; cwd?: string; allowedTools?: string; model?: string; temperature?: number; attachments?: Attachment[] } }
+  | { type: "session.start"; payload: { title: string; prompt: string; cwd?: string; allowedTools?: string; model?: string; temperature?: number; enableSessionGitRepo?: boolean; attachments?: Attachment[] } }
   | { type: "session.continue"; payload: { sessionId: string; prompt: string; retry?: boolean; retryReason?: string; attachments?: Attachment[] } }
   | { type: "session.stop"; payload: { sessionId: string } }
   | { type: "session.delete"; payload: { sessionId: string } }

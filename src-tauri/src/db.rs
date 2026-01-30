@@ -32,6 +32,7 @@ impl Database {
                 model TEXT,
                 thread_id TEXT,
                 temperature REAL,
+                enable_session_git_repo INTEGER,
                 is_pinned INTEGER DEFAULT 0,
                 input_tokens INTEGER DEFAULT 0,
                 output_tokens INTEGER DEFAULT 0,
@@ -116,6 +117,12 @@ impl Database {
             [],
         ); // Ignore error if column already exists
 
+        // Migration: add enable_session_git_repo column if not exists
+        let _ = conn.execute(
+            "ALTER TABLE sessions ADD COLUMN enable_session_git_repo INTEGER",
+            [],
+        ); // Ignore error if column already exists
+
         Ok(())
     }
 
@@ -126,8 +133,8 @@ impl Database {
 
         conn.execute(
             r#"INSERT INTO sessions 
-               (id, title, status, cwd, allowed_tools, last_prompt, model, thread_id, temperature, created_at, updated_at)
-               VALUES (?1, ?2, 'idle', ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#,
+               (id, title, status, cwd, allowed_tools, last_prompt, model, thread_id, temperature, enable_session_git_repo, created_at, updated_at)
+               VALUES (?1, ?2, 'idle', ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"#,
             params![
                 &id,
                 &params.title,
@@ -137,6 +144,7 @@ impl Database {
                 &params.model,
                 &params.thread_id,
                 &params.temperature,
+                &params.enable_session_git_repo,
                 now,
                 now
             ],
@@ -153,6 +161,7 @@ impl Database {
             model: params.model.clone(),
             thread_id: params.thread_id.clone(),
             temperature: params.temperature,
+            enable_session_git_repo: params.enable_session_git_repo,
             is_pinned: false,
             input_tokens: 0,
             output_tokens: 0,
@@ -165,7 +174,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             r#"SELECT id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, 
-                      model, thread_id, temperature, is_pinned, input_tokens, output_tokens, created_at, updated_at
+                      model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, created_at, updated_at
                FROM sessions ORDER BY updated_at DESC"#
         )?;
 
@@ -181,11 +190,12 @@ impl Database {
                 model: row.get(7)?,
                 thread_id: row.get(8)?,
                 temperature: row.get(9)?,
-                is_pinned: row.get::<_, i32>(10)? != 0,
-                input_tokens: row.get(11)?,
-                output_tokens: row.get(12)?,
-                created_at: row.get(13)?,
-                updated_at: row.get(14)?,
+                enable_session_git_repo: row.get(10)?,
+                is_pinned: row.get::<_, i32>(11)? != 0,
+                input_tokens: row.get(12)?,
+                output_tokens: row.get(13)?,
+                created_at: row.get(14)?,
+                updated_at: row.get(15)?,
             })
         })?;
 
@@ -196,7 +206,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             r#"SELECT id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, 
-                      model, thread_id, temperature, is_pinned, input_tokens, output_tokens, created_at, updated_at
+                      model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, created_at, updated_at
                FROM sessions WHERE id = ?1"#
         )?;
 
@@ -212,11 +222,12 @@ impl Database {
                 model: row.get(7)?,
                 thread_id: row.get(8)?,
                 temperature: row.get(9)?,
-                is_pinned: row.get::<_, i32>(10)? != 0,
-                input_tokens: row.get(11)?,
-                output_tokens: row.get(12)?,
-                created_at: row.get(13)?,
-                updated_at: row.get(14)?,
+                enable_session_git_repo: row.get(10)?,
+                is_pinned: row.get::<_, i32>(11)? != 0,
+                input_tokens: row.get(12)?,
+                output_tokens: row.get(13)?,
+                created_at: row.get(14)?,
+                updated_at: row.get(15)?,
             })
         })?;
 
@@ -507,6 +518,8 @@ pub struct Session {
     pub thread_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_session_git_repo: Option<bool>,
     #[serde(default)]
     pub is_pinned: bool,
     #[serde(default)]
@@ -535,6 +548,8 @@ pub struct CreateSessionParams {
     pub thread_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_session_git_repo: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

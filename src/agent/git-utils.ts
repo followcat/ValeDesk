@@ -2,15 +2,15 @@
  * Git utilities for tracking and rolling back file changes
  */
 
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 
 /**
  * Check if current directory is a git repository
  */
 export function isGitRepo(cwd: string): boolean {
   try {
-    execSync("git rev-parse --git-dir", { cwd, stdio: "ignore" });
-    return true;
+    const result = spawnSync("git", ["rev-parse", "--git-dir"], { cwd, stdio: "ignore" });
+    return result.status === 0;
   } catch {
     return false;
   }
@@ -28,34 +28,34 @@ export function isGitRepo(cwd: string): boolean {
 export function getFileDiffStats(filePath: string, cwd: string): { additions: number; deletions: number } {
   try {
     // Try diff against HEAD first (for modified files)
-    let output = execSync(`git diff --numstat HEAD -- "${filePath}"`, {
+    let output = spawnSync("git", ["diff", "--numstat", "HEAD", "--", filePath], {
       cwd,
       encoding: "utf-8",
-    }).trim();
+    }).stdout?.toString().trim() || "";
 
     // If no diff, check staged changes (for new files that were git add'd)
     if (!output) {
-      output = execSync(`git diff --numstat --cached -- "${filePath}"`, {
+      output = spawnSync("git", ["diff", "--numstat", "--cached", "--", filePath], {
         cwd,
         encoding: "utf-8",
-      }).trim();
+      }).stdout?.toString().trim() || "";
     }
 
     // If still no diff, check git status for new unstaged files
     if (!output) {
       try {
-        const statusOutput = execSync(`git status --short -- "${filePath}"`, {
+        const statusOutput = spawnSync("git", ["status", "--short", "--", filePath], {
           cwd,
           encoding: "utf-8",
-        }).trim();
+        }).stdout?.toString().trim() || "";
 
         // git status --short format: "?? filename" for untracked new files
         if (statusOutput && statusOutput.startsWith('??')) {
           // New file, count lines
-          const { readFile } = require('fs');
+          const { readFileSync } = require('fs');
           const { resolve } = require('path');
           const fullFilePath = resolve(cwd, filePath);
-          const content = readFile(fullFilePath, 'utf-8');
+          const content = readFileSync(fullFilePath, 'utf-8');
           const lineCount = content.split('\n').length;
           return { additions: lineCount, deletions: 0 };
         }
@@ -85,10 +85,10 @@ export function getFileDiffStats(filePath: string, cwd: string): { additions: nu
  */
 export function getRelativePath(filePath: string, cwd: string): string {
   try {
-    const relativePath = execSync(`git ls-files --full-name "${filePath}"`, {
+    const relativePath = spawnSync("git", ["ls-files", "--full-name", "--", filePath], {
       cwd,
       encoding: "utf-8",
-    }).trim();
+    }).stdout?.toString().trim() || "";
 
     return relativePath || filePath;
   } catch {
@@ -103,10 +103,10 @@ export function getRelativePath(filePath: string, cwd: string): string {
  */
 export function getChangedFiles(cwd: string): string[] {
   try {
-    const output = execSync("git diff --name-only HEAD", {
+    const output = spawnSync("git", ["diff", "--name-only", "HEAD"], {
       cwd,
       encoding: "utf-8",
-    }).trim();
+    }).stdout?.toString().trim() || "";
 
     return output ? output.split("\n").filter(Boolean) : [];
   } catch (error) {
@@ -120,10 +120,11 @@ export function getChangedFiles(cwd: string): string[] {
  */
 export function checkoutFile(filePath: string, cwd: string): boolean {
   try {
-    execSync(`git checkout HEAD -- "${filePath}"`, {
+    const result = spawnSync("git", ["checkout", "HEAD", "--", filePath], {
       cwd,
       stdio: "pipe",
     });
+    if (result.status !== 0) return false;
     return true;
   } catch (error) {
     console.error(`Error checking out ${filePath}:`, error);
