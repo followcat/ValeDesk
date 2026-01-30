@@ -243,7 +243,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           const mergedMessages = loadType === "prepend"
             ? [...messages, ...(existing.messages || [])]
             : messages;
-          let fileChangesByMessage = loadType === "prepend" ? (existing.fileChangesByMessage || {}) : {};
+          let fileChangesByMessage = loadType === "prepend" ? (existing.fileChangesByMessage || {}) : { ...(existing.fileChangesByMessage || {}) };
           if (loadType === "prepend" && Object.keys(fileChangesByMessage).length > 0) {
             const shift = messages.length;
             const shifted: Record<number, FileChange[]> = {};
@@ -254,6 +254,23 @@ export const useAppStore = create<AppState>((set, get) => ({
               }
             });
             fileChangesByMessage = shifted;
+          } else if (loadType !== "prepend" && (fileChangesByMessage && Object.keys(fileChangesByMessage).length === 0)) {
+            // Seed per-message map from DB-backed fileChanges for restored sessions
+            const resolvedFileChanges = fileChanges ?? [];
+            if (resolvedFileChanges.length > 0 && mergedMessages.length > 0) {
+              let lastResultIndex: number | null = null;
+              for (let i = mergedMessages.length - 1; i >= 0; i -= 1) {
+                const msg = mergedMessages[i] as any;
+                if (msg?.type === "result") {
+                  lastResultIndex = i;
+                  break;
+                }
+              }
+              if (lastResultIndex === null) {
+                lastResultIndex = mergedMessages.length - 1;
+              }
+              fileChangesByMessage = { ...fileChangesByMessage, [lastResultIndex]: resolvedFileChanges };
+            }
           }
           return {
             sessions: {
@@ -630,12 +647,19 @@ export const useAppStore = create<AppState>((set, get) => ({
           const existing = state.sessions[sessionId];
           if (!existing || !existing.fileChanges) return {};
           const confirmedChanges = existing.fileChanges.map(c => ({ ...c, status: 'confirmed' as const }));
+          const nextFileChangesByMessage = { ...(existing.fileChangesByMessage || {}) };
+          if (Object.keys(nextFileChangesByMessage).length > 0) {
+            Object.entries(nextFileChangesByMessage).forEach(([key, value]) => {
+              nextFileChangesByMessage[Number(key)] = value.map(c => ({ ...c, status: 'confirmed' as const }));
+            });
+          }
           return {
             sessions: {
               ...state.sessions,
               [sessionId]: {
                 ...existing,
-                fileChanges: confirmedChanges
+                fileChanges: confirmedChanges,
+                fileChangesByMessage: nextFileChangesByMessage
               }
             }
           };
@@ -648,13 +672,34 @@ export const useAppStore = create<AppState>((set, get) => ({
         set((state) => {
           const existing = state.sessions[sessionId];
           if (!existing) return {};
+          const remainingChanges = fileChanges ?? [];
+          const nextFileChangesByMessage = { ...(existing.fileChangesByMessage || {}) };
+          if (existing.messages.length > 0) {
+            let lastResultIndex: number | null = null;
+            for (let i = existing.messages.length - 1; i >= 0; i -= 1) {
+              const msg = existing.messages[i] as any;
+              if (msg?.type === "result") {
+                lastResultIndex = i;
+                break;
+              }
+            }
+            if (lastResultIndex === null) {
+              lastResultIndex = existing.messages.length - 1;
+            }
+            if (remainingChanges.length > 0) {
+              nextFileChangesByMessage[lastResultIndex] = remainingChanges;
+            } else {
+              delete nextFileChangesByMessage[lastResultIndex];
+            }
+          }
           // Remaining fileChanges (failed rollback) or empty array if all succeeded
           return {
             sessions: {
               ...state.sessions,
               [sessionId]: {
                 ...existing,
-                fileChanges: fileChanges ?? []
+                fileChanges: remainingChanges,
+                fileChangesByMessage: nextFileChangesByMessage
               }
             }
           };
