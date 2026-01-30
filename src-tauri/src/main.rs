@@ -907,13 +907,18 @@ fn get_file_content_at_commit(params: GetFileContentAtCommitParams) -> Result<St
 #[tauri::command]
 fn get_file_snapshot(params: GetFileContentParams) -> Result<String, String> {
   use std::path::PathBuf;
-  
+
+  // Prevent path traversal: only allow relative file paths (no absolute, no ..)
+  if Path::new(&params.file_path).is_absolute() || params.file_path.contains("..") {
+    return Err("[get_file_snapshot] Invalid file path".to_string());
+  }
+
   // Create snapshot directory path: .valedesk/snapshots/relative/path/to/file
   let snapshot_path = PathBuf::from(&params.cwd)
     .join(".valedesk")
     .join("snapshots")
     .join(&params.file_path);
-  
+
   match fs::read_to_string(&snapshot_path) {
     Ok(content) => Ok(content),
     Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -927,19 +932,24 @@ fn get_file_snapshot(params: GetFileContentParams) -> Result<String, String> {
 #[tauri::command]
 fn save_file_snapshot(params: SaveFileSnapshotParams) -> Result<(), String> {
   use std::path::PathBuf;
-  
+
+  // Prevent path traversal: only allow relative file paths (no absolute, no ..)
+  if Path::new(&params.file_path).is_absolute() || params.file_path.contains("..") {
+    return Err("[save_file_snapshot] Invalid file path".to_string());
+  }
+
   // Create snapshot directory path: .valedesk/snapshots/relative/path/to/file
   let snapshot_path = PathBuf::from(&params.cwd)
     .join(".valedesk")
     .join("snapshots")
     .join(&params.file_path);
-  
+
   // Create parent directory if it doesn't exist
   if let Some(parent) = snapshot_path.parent() {
     fs::create_dir_all(parent)
       .map_err(|e| format!("[save_file_snapshot] Failed to create directory: {e}"))?;
   }
-  
+
   // Save the content
   fs::write(&snapshot_path, params.content)
     .map_err(|e| format!("[save_file_snapshot] Failed to write snapshot: {e}"))
@@ -947,11 +957,16 @@ fn save_file_snapshot(params: SaveFileSnapshotParams) -> Result<(), String> {
 
 #[tauri::command]
 fn get_file_new_content(params: GetFileContentParams) -> Result<String, String> {
+  // Prevent path traversal: only allow relative file paths (no absolute, no ..)
+  if Path::new(&params.file_path).is_absolute() || params.file_path.contains("..") {
+    return Err("[get_file_new_content] Invalid file path".to_string());
+  }
+
   let full_path = Path::new(&params.cwd).join(&params.file_path);
-  
+
   eprintln!("[get_file_new_content] Reading file: cwd={}, file_path={}, full_path={}", 
     params.cwd, params.file_path, full_path.display());
-  
+
   // Always read from working directory (disk) - this contains the current/new content
   // If file doesn't exist, return empty string (new file)
   match fs::read_to_string(&full_path) {
