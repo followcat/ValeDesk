@@ -20,6 +20,7 @@ import { loadSkillsSettings, toggleSkill, setMarketplaceUrl } from "../agent/lib
 import { fetchSkillsFromMarketplace } from "../agent/libs/skills-loader.js";
 import { webCache } from "../agent/libs/web-cache.js";
 import * as gitUtils from "../agent/git-utils.js";
+import { generateSessionTitle } from "../agent/libs/util.js";
 
 type RunnerHandle = {
   abort: () => void;
@@ -243,15 +244,16 @@ function commitSessionChanges(sessionId: string) {
     const diffArgs = hasParent
       ? ["diff", "--numstat", `${commitHash}^`, commitHash]
       : ["show", "--numstat", "--format=", commitHash];
-    const diffOutput = spawnSync("git", diffArgs, { cwd, encoding: "utf8" }).stdout?.toString() || "";
+    const diffOutput = spawnSync("git", ["-c", "core.quotepath=false", ...diffArgs], { cwd, encoding: "utf8" })
+      .stdout?.toString() || "";
 
     const fileChanges: FileChange[] = diffOutput
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => {
-        const [addRaw, delRaw, ...pathParts] = line.split(/\s+/);
-        const rawPath = pathParts.join(" ");
+        const [addRaw, delRaw, ...pathParts] = line.split("\t");
+        const rawPath = pathParts.length > 0 ? pathParts.join("\t") : line.split(/\s+/).slice(2).join(" ");
         const normalizedPath = rawPath.includes("=>")
           ? rawPath.replace(/\{[^}]*=>\s*([^}]+)\}/g, "$1").split("=>").pop()!.trim()
           : rawPath.trim();
@@ -266,13 +268,11 @@ function commitSessionChanges(sessionId: string) {
         };
       });
 
-    if (fileChanges.length > 0) {
-      sessions.saveFileChanges(sessionId, fileChanges);
-      emit({
-        type: "file_changes.updated",
-        payload: { sessionId, fileChanges }
-      } as any);
-    }
+    sessions.saveFileChanges(sessionId, fileChanges);
+    emit({
+      type: "file_changes.updated",
+      payload: { sessionId, fileChanges }
+    } as any);
   } catch (error) {
     console.warn("[sidecar] Auto-commit error:", error);
   }
@@ -598,6 +598,22 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
     payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd, model: session.model, temperature: session.temperature },
   } as any);
 
+  if (session.title === "New Chat" && event.payload.prompt) {
+    generateSessionTitle(event.payload.prompt, session.model)
+      .then((newTitle) => {
+        if (newTitle && newTitle !== "New Chat") {
+          sessions.updateSession(session.id, { title: newTitle });
+          emit({
+            type: "session.status",
+            payload: { sessionId: session.id, status: session.status, title: newTitle, cwd: session.cwd, model: session.model, temperature: session.temperature },
+          } as any);
+        }
+      })
+      .catch((error) => {
+        console.error("[sidecar] Failed to generate title for new session:", error);
+      });
+  }
+
   emitAndPersist({ type: "stream.user_prompt", payload: { sessionId: session.id, prompt: event.payload.prompt, attachments: event.payload.attachments } } as any);
   startRunner(session.id, event.payload.prompt, event.payload.attachments);
 }
@@ -642,6 +658,22 @@ function handleSessionContinue(event: Extract<ClientEvent, { type: "session.cont
     type: "session.status",
     payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd, model: session.model, temperature: session.temperature },
   } as any);
+
+  if (session.title === "New Chat" && prompt) {
+    generateSessionTitle(prompt, session.model)
+      .then((newTitle) => {
+        if (newTitle && newTitle !== "New Chat") {
+          sessions.updateSession(session.id, { title: newTitle });
+          emit({
+            type: "session.status",
+            payload: { sessionId: session.id, status: session.status, title: newTitle, cwd: session.cwd, model: session.model, temperature: session.temperature },
+          } as any);
+        }
+      })
+      .catch((error) => {
+        console.error("[sidecar] Failed to generate title for continued session:", error);
+      });
+  }
 
   emitAndPersist({ type: "stream.user_prompt", payload: { sessionId: session.id, prompt, attachments } } as any);
   startRunner(session.id, prompt, attachments);

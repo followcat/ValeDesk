@@ -212,15 +212,16 @@ function commitSessionChanges(sessionId: string) {
     const diffArgs = hasParent
       ? ["diff", "--numstat", `${commitHash}^`, commitHash]
       : ["show", "--numstat", "--format=", commitHash];
-    const diffOutput = spawnSync("git", diffArgs, { cwd, encoding: "utf8" }).stdout?.toString() || "";
+    const diffOutput = spawnSync("git", ["-c", "core.quotepath=false", ...diffArgs], { cwd, encoding: "utf8" })
+      .stdout?.toString() || "";
 
     const fileChanges = diffOutput
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => {
-        const [addRaw, delRaw, ...pathParts] = line.split(/\s+/);
-        const rawPath = pathParts.join(" ");
+        const [addRaw, delRaw, ...pathParts] = line.split("\t");
+        const rawPath = pathParts.length > 0 ? pathParts.join("\t") : line.split(/\s+/).slice(2).join(" ");
         const normalizedPath = rawPath.includes("=>")
           ? rawPath.replace(/\{[^}]*=>\s*([^}]+)\}/g, "$1").split("=>").pop()!.trim()
           : rawPath.trim();
@@ -235,13 +236,11 @@ function commitSessionChanges(sessionId: string) {
         };
       });
 
-    if (fileChanges.length > 0) {
-      sessions.saveFileChanges(sessionId, fileChanges);
-      emit({
-        type: "file_changes.updated",
-        payload: { sessionId, fileChanges }
-      });
-    }
+    sessions.saveFileChanges(sessionId, fileChanges);
+    emit({
+      type: "file_changes.updated",
+      payload: { sessionId, fileChanges }
+    });
   } catch (error) {
     console.warn("[ipc] Auto-commit error:", error);
   }
@@ -616,6 +615,29 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd, model: session.model }
     });
 
+    if (session.title === "New Chat" && event.payload.prompt) {
+      generateSessionTitle(event.payload.prompt, session.model)
+        .then((newTitle) => {
+          if (newTitle && newTitle !== "New Chat") {
+            sessions.updateSession(session.id, { title: newTitle });
+            const updated = sessions.getSession(session.id);
+            sessionManager.emitToWindow(windowId, {
+              type: "session.status",
+              payload: {
+                sessionId: session.id,
+                status: updated?.status ?? session.status,
+                title: newTitle,
+                cwd: session.cwd,
+                model: session.model
+              }
+            });
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to generate title for new session:', err);
+        });
+    }
+
     // Use emit() to save user_prompt to DB AND send to UI
     emit({
       type: "stream.user_prompt",
@@ -631,7 +653,7 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       onSessionUpdate: (updates) => {
         sessions.updateSession(session.id, updates);
       }
-    });
+    })
       .then((handle) => {
         runnerHandles.set(session.id, handle);
         sessions.setAbortController(session.id, undefined);
@@ -674,7 +696,7 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
     let sessionTitle = session.title;
     if (isFirstRun && session.title === "New Chat" && event.payload.prompt) {
       // Generate title asynchronously but don't block
-      generateSessionTitle(event.payload.prompt)
+      generateSessionTitle(event.payload.prompt, session.model)
         .then((newTitle) => {
           if (newTitle && newTitle !== "New Chat") {
             sessions.updateSession(session.id, { title: newTitle });
