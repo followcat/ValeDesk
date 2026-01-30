@@ -9,7 +9,7 @@ import type { ServerEvent } from "../agent/types.js";
 import type { SidecarInboundMessage, SidecarOutboundMessage } from "./protocol.js";
 
 // Use in-memory session store - no SQLite/better-sqlite3 dependency
-import { MemorySessionStore } from "./session-store-memory.js";
+import { MemorySessionStore, type Session } from "./session-store-memory.js";
 
 import { runClaude as runClaudeSDK } from "../agent/libs/runner.js";
 import { runClaude as runOpenAI } from "../agent/libs/runner-openai.js";
@@ -704,9 +704,9 @@ function handleSessionPin(event: Extract<ClientEvent, { type: "session.pin" }>) 
 function handleSessionUpdateCwd(event: Extract<ClientEvent, { type: "session.update-cwd" }>) {
   const { sessionId, cwd } = event.payload;
   sessions.updateSession(sessionId, { cwd });
-  ensureSessionGitRepo(cwd);
   const session = sessions.getSession(sessionId);
   if (!session) return;
+  ensureSessionGitRepo(session);
   emit({
     type: "session.status",
     payload: { sessionId: session.id, status: session.status, title: session.title, cwd: session.cwd, model: session.model, temperature: session.temperature },
