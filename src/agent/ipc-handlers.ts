@@ -198,7 +198,11 @@ function commitSessionChanges(sessionId: string) {
     return;
   }
 
-  if (!settings?.enableSessionGitRepo) return;
+  // Check per-session setting first, fall back to global setting
+  const enabled = session.enableSessionGitRepo !== undefined 
+    ? session.enableSessionGitRepo 
+    : (settings?.enableSessionGitRepo ?? false);
+  if (!enabled) return;
   if (!isGitAvailable()) return;
   if (!gitUtils.isGitRepo(cwd)) return;
 
@@ -258,7 +262,8 @@ function commitSessionChanges(sessionId: string) {
   }
 }
 
-function ensureSessionGitRepo(cwd?: string) {
+function ensureSessionGitRepo(session: Session) {
+  const cwd = session.cwd;
   if (!cwd || !cwd.trim()) return;
 
   let settings: ApiSettings | null = null;
@@ -269,7 +274,11 @@ function ensureSessionGitRepo(cwd?: string) {
     return;
   }
 
-  if (!settings?.enableSessionGitRepo) return;
+  // Check per-session setting first, fall back to global setting
+  const enabled = session.enableSessionGitRepo !== undefined 
+    ? session.enableSessionGitRepo 
+    : (settings?.enableSessionGitRepo ?? false);
+  if (!enabled) return;
   if (!isWhitelistedSessionGitCwd(cwd, settings)) {
     console.warn("[ipc] Refusing to init session git repo outside session dir:", cwd);
     return;
@@ -599,9 +608,10 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       allowedTools: event.payload.allowedTools,
       prompt: event.payload.prompt,
       model: event.payload.model,
-      temperature: event.payload.temperature
+      temperature: event.payload.temperature,
+      enableSessionGitRepo: event.payload.enableSessionGitRepo
     });
-    ensureSessionGitRepo(session.cwd);
+    ensureSessionGitRepo(session);
 
     // Subscribe this window to the session
     sessionManager.setWindowSession(windowId, session.id);
@@ -814,9 +824,9 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
   if (event.type === "session.update-cwd") {
     const { sessionId, cwd } = event.payload;
     sessions.updateSession(sessionId, { cwd });
-    ensureSessionGitRepo(cwd);
     const session = sessions.getSession(sessionId);
     if (session) {
+      ensureSessionGitRepo(session);
       // Use emit to route only to subscribed windows
       emit({
         type: "session.status",

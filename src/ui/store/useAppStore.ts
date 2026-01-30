@@ -770,6 +770,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               prompt: prompt,
               model: model,
               cwd: undefined,
+              enableSessionGitRepo: apiSettings?.enableSessionGitRepo ?? false,
             }
           });
         }

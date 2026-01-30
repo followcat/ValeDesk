@@ -218,7 +218,11 @@ function commitSessionChanges(sessionId: string) {
     return;
   }
 
-  if (!settings?.enableSessionGitRepo) return;
+  // Check per-session setting first, fall back to global setting
+  const enabled = session.enableSessionGitRepo !== undefined 
+    ? session.enableSessionGitRepo 
+    : (settings?.enableSessionGitRepo ?? false);
+  if (!enabled) return;
   if (!isGitAvailable()) return;
   if (!gitUtils.isGitRepo(cwd)) return;
 
@@ -278,7 +282,8 @@ function commitSessionChanges(sessionId: string) {
   }
 }
 
-function ensureSessionGitRepo(cwd?: string) {
+function ensureSessionGitRepo(session: Session | undefined) {
+  const cwd = session?.cwd;
   if (!cwd || !cwd.trim()) return;
 
   let settings: ApiSettings | null = null;
@@ -289,7 +294,11 @@ function ensureSessionGitRepo(cwd?: string) {
     return;
   }
 
-  if (!settings?.enableSessionGitRepo) return;
+  // Check per-session setting first, fall back to global setting
+  const enabled = session.enableSessionGitRepo !== undefined 
+    ? session.enableSessionGitRepo 
+    : (settings?.enableSessionGitRepo ?? false);
+  if (!enabled) return;
   if (!isGitAvailable()) {
     console.warn("[sidecar] Git not available; skipping session repo init");
     return;
@@ -569,8 +578,6 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
     }
   }
 
-  ensureSessionGitRepo(resolvedCwd);
-
   const session = sessions.createSession({
     id: forcedSessionId,
     cwd: resolvedCwd,
@@ -580,7 +587,10 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
     model: event.payload.model,
     threadId: event.payload.threadId,
     temperature: event.payload.temperature,
+    enableSessionGitRepo: event.payload.enableSessionGitRepo,
   });
+
+  ensureSessionGitRepo(session);
 
   const hasAttachments = Array.isArray(event.payload.attachments) && event.payload.attachments.length > 0;
   if ((!event.payload.prompt || event.payload.prompt.trim() === "") && !hasAttachments) {
