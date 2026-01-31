@@ -118,7 +118,7 @@ export function validateADRChain(adrs: ADRItem[] | undefined): ValidationResult 
 
     // Check for proposed ADRs that are old (>24h)
     if (adr.status === 'proposed') {
-      const ageHours = (Date.now() - adr.date) / (1000 * 60 * 60);
+      const ageHours = (Date.now() - adr.createdAt) / (1000 * 60 * 60);
       if (ageHours > 24) {
         warnings.push({
           code: 'ADR_STALE_PROPOSED',

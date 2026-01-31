@@ -110,7 +110,7 @@ function formatADRMarkdown(adr: ADRItem): string {
   lines.push(`**ID:** ${adr.id}`);
   lines.push(`**Status:** ${adr.status}`);
   lines.push(`**Type:** ${adr.type}`);
-  lines.push(`**Date:** ${new Date(adr.date).toISOString().slice(0, 10)}`);
+  lines.push(`**Date:** ${new Date(adr.createdAt).toISOString().slice(0, 10)}`);
   lines.push('');
   
   lines.push('## Context');
@@ -173,7 +173,7 @@ function formatADRList(adrs: ADRItem[]): string {
   lines.push('|----|-------|--------|------|------|');
   
   for (const adr of adrs) {
-    const date = new Date(adr.date).toISOString().slice(0, 10);
+    const date = new Date(adr.createdAt).toISOString().slice(0, 10);
     lines.push(`| ${adr.id} | ${adr.title} | ${adr.status} | ${adr.type} | ${date} |`);
   }
   
@@ -243,11 +243,12 @@ export async function executeADRTool(
         title: args.title,
         status: args.status || 'proposed',
         type: args.type,
-        date: Date.now(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
         context: args.context,
         decision: args.decision,
-        consequences: args.consequences,
-        alternatives: args.alternatives,
+        consequences: args.consequences?.join('; ') || '',
+        alternatives: args.alternatives?.join('; '),
         charterRefs: args.charter_refs,
         supersedes: args.supersedes,
         charterHashBefore: args.charter_hash_before,

@@ -25,10 +25,11 @@ function createCharterChangeADR(
     title: `Charter Update: ${changedFields.join(', ')}`,
     status: 'accepted',  // Charter changes are auto-accepted
     type: 'charter-change',
-    date: Date.now(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
     context: `Charter was updated. Changed fields: ${changedFields.join(', ')}`,
     decision: 'Update charter to reflect new requirements/constraints',
-    consequences: ['Session scope has been modified', 'Previous charter hash is now outdated'],
+    consequences: 'Session scope has been modified; Previous charter hash is now outdated',
     charterHashBefore: oldHash,
     charterHashAfter: newHash
   };
