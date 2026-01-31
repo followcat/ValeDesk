@@ -586,7 +586,7 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       payload: {
         sessionId: history.session.id,
         status: history.session.status,
-        messages: history.messages.filter((message: any) => message?.type !== "system_summary"),
+        messages: history.messages,
         inputTokens: history.session.inputTokens,
         outputTokens: history.session.outputTokens,
         todos: history.todos || [],
@@ -934,7 +934,7 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
         payload: {
           sessionId: updatedHistory.session.id,
           status: updatedHistory.session.status,
-          messages: updatedHistory.messages.filter((message: any) => message?.type !== "system_summary"),
+          messages: updatedHistory.messages,
           todos: updatedHistory.todos || [],
           model: updatedHistory.session.model
         }
