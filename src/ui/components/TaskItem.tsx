@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import type { MultiThreadTask, SessionInfo } from "../types";
 
@@ -23,6 +24,7 @@ export function TaskItem({
   isCollapsed = false,
   onToggleCollapse
 }: TaskItemProps) {
+  const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
 
@@ -93,7 +95,7 @@ export function TaskItem({
 
             {/* Status indicator */}
             {isCreated && (
-              <span className="w-2 h-2 rounded-full bg-warning flex-shrink-0" title="Ready to start" />
+              <span className="w-2 h-2 rounded-full bg-warning flex-shrink-0" title={t("multiThread.readyToStart")} />
             )}
             {isRunning && (
               <span className="w-2 h-2 rounded-full bg-info animate-pulse flex-shrink-0" />
@@ -133,7 +135,7 @@ export function TaskItem({
                   sendEvent({ type: 'task.start', payload: { taskId: task.id } });
                 }}
                 className="text-xs font-medium px-2 py-1 bg-warning text-white rounded hover:bg-warning/80 transition-colors"
-                title="Start all threads"
+                title={t("multiThread.startAllThreads")}
               >
                 ▶ Start
               </button>
@@ -143,7 +145,7 @@ export function TaskItem({
               <DropdownMenu.Trigger asChild>
                 <button
                   className="p-1 text-ink-400 hover:text-ink-600 transition-colors"
-                  title="More options"
+                title={t("common.moreOptions")}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,7 +166,7 @@ export function TaskItem({
                       setIsEditing(true);
                     }}
                   >
-                    Rename
+                    {t("common.rename")}
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer rounded"
@@ -173,7 +175,7 @@ export function TaskItem({
                       onDeleteTask(task.id);
                     }}
                   >
-                    Delete
+                    {t("common.delete")}
                   </DropdownMenu.Item>
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
@@ -184,16 +186,16 @@ export function TaskItem({
         {/* Brief status info */}
         <div className="flex items-center gap-2 mt-1.5 text-xs text-muted">
           {isCreated ? (
-            <span>{totalCount} threads ready</span>
+            <span>{t("sidebar.threadsReady", { count: totalCount })}</span>
           ) : (
             <>
-              <span>{completedCount}/{totalCount} done</span>
-              {runningCount > 0 && <span>• {runningCount} running</span>}
-              {errorCount > 0 && <span>• {errorCount} errors</span>}
+              <span>{t("taskItem.threadsDone", { completed: completedCount, total: totalCount })}</span>
+              {runningCount > 0 && <span>• {t("taskItem.runningCount", { count: runningCount })}</span>}
+              {errorCount > 0 && <span>• {t("taskItem.errorCount", { count: errorCount })}</span>}
             </>
           )}
           {totalTokens > 0 && (
-            <span>• {totalTokens.toLocaleString()} tokens</span>
+            <span>• {t("sidebar.tokensLabel", { count: totalTokens.toLocaleString() })}</span>
           )}
         </div>
 
@@ -216,16 +218,16 @@ export function TaskItem({
           {/* Mode badges */}
           <div className="flex items-center gap-1 mb-2">
             <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-accent/10 text-accent">
-              {task.mode === 'consensus' ? 'Consensus' : 'Different Tasks'}
+              {task.mode === 'consensus' ? t("taskItem.modeConsensus") : t("taskItem.modeDifferent")}
             </span>
             {task.shareWebCache && (
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-ink-100 text-ink-600">
-                Shared Cache
+                {t("sidebar.sharedCache")}
               </span>
             )}
             {task.autoSummary && (
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-purple-100 text-purple-600">
-                Auto-Summary
+                {t("sidebar.autoSummary")}
               </span>
             )}
           </div>
@@ -236,7 +238,7 @@ export function TaskItem({
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              Threads
+              {t("taskItem.threadsLabel")}
             </div>
             {threads.map((thread) => {
               const isSummaryThread = thread.id === task.summaryThreadId;

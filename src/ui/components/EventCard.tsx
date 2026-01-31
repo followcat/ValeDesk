@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store/useAppStore";
 import type {
   PermissionResult,
@@ -81,6 +82,7 @@ const SessionResult = ({ message, fileChanges, sessionId, onConfirmChanges, onRo
   onConfirmChanges?: (sessionId: string) => void;
   onRollbackChanges?: (sessionId: string) => void;
 }) => {
+  const { t } = useTranslation();
   const [diffModalOpen, setDiffModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<ChangedFile | null>(null);
   
@@ -122,18 +124,18 @@ const SessionResult = ({ message, fileChanges, sessionId, onConfirmChanges, onRo
   return (
     <>
       <div className="flex flex-col gap-2 mt-4">
-        <div className="header text-accent">Session Result</div>
+        <div className="header text-accent">{t("eventCard.sessionResult")}</div>
         <div className="flex flex-col rounded-xl px-4 py-3 border border-ink-900/10 bg-surface-secondary space-y-2">
           <div className="flex flex-wrap items-center gap-2 text-[14px]">
-            <span className="font-normal">Duration</span>
+            <span className="font-normal">{t("eventCard.duration")}</span>
             <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">{formatMinutes(message.duration_ms)}</span>
-            <span className="font-normal">API</span>
+            <span className="font-normal">{t("eventCard.apiDuration")}</span>
             <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">{formatMinutes(message.duration_api_ms)}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[14px]">
-            <span className="font-normal">Tokens</span>
-            <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">input:{formatMillions(message.usage?.input_tokens)}</span>
-            <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">output:{formatMillions(message.usage?.output_tokens)}</span>
+            <span className="font-normal">{t("eventCard.tokens")}</span>
+            <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">{t("eventCard.tokenInput", { count: formatMillions(message.usage?.input_tokens) })}</span>
+            <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">{t("eventCard.tokenOutput", { count: formatMillions(message.usage?.output_tokens) })}</span>
             {hasCost && (
               <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-accent text-[13px]">
                 ${formatUsd(message.total_cost_usd)}
@@ -178,6 +180,7 @@ function extractTagContent(input: string, tag: string): string | null {
 }
 
 const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) => {
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const isFirstRender = useRef(true);
@@ -241,7 +244,7 @@ const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) =
 
   return (
     <div className="flex flex-col mt-4 overflow-hidden">
-      <div className="header text-accent">Output</div>
+      <div className="header text-accent">{t("eventCard.output")}</div>
       <div className="mt-2 rounded-xl bg-surface-tertiary p-3 overflow-hidden">
         <pre className={`text-sm whitespace-pre-wrap break-words font-mono overflow-x-auto ${isError ? "text-red-500" : "text-ink-700"}`}>
           {isMarkdownContent ? <MDContent text={visibleContent} /> : visibleContent}
@@ -251,7 +254,7 @@ const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) =
             {filePaths.map((path) => (
               <div key={path} className="flex items-center justify-between gap-2 rounded-lg bg-surface px-3 py-2 border border-ink-900/10">
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs text-muted">File</div>
+                  <div className="text-xs text-muted">{t("eventCard.fileLabel")}</div>
                   <div className="text-xs font-mono text-ink-700 truncate" title={path}>{path}</div>
                 </div>
                 <div className="shrink-0 flex items-center gap-2">
@@ -259,14 +262,14 @@ const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) =
                     className="rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover transition-colors"
                     onClick={() => getPlatform().send('open-file', path)}
                   >
-                    Preview
+                    {t("common.preview")}
                   </button>
                   <button
                     className="rounded-full border border-ink-900/10 bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-tertiary transition-colors"
                     onClick={() => getPlatform().invoke('open-path-in-finder', path)}
-                    title="Show in folder"
+                    title={t("eventCard.showInFolder")}
                   >
-                    Save As
+                    {t("eventCard.saveAs")}
                   </button>
                 </div>
               </div>
@@ -276,7 +279,11 @@ const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) =
         {hasMoreLines && (
           <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-sm text-accent hover:text-accent-hover transition-colors flex items-center gap-1">
             <span>{isExpanded ? "▲" : "▼"}</span>
-            <span>{isExpanded ? "Collapse" : `Show ${lines.length - MAX_VISIBLE_LINES} more lines`}</span>
+            <span>
+              {isExpanded
+                ? t("eventCard.collapse")
+                : t("eventCard.showMoreLines", { count: lines.length - MAX_VISIBLE_LINES })}
+            </span>
           </button>
         )}
         <div ref={bottomRef} />
@@ -286,6 +293,7 @@ const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) =
 };
 
 const AssistantBlockCard = ({ title, text, showIndicator = false, isTextBlock = false }: { title: string; text: string; showIndicator?: boolean; isTextBlock?: boolean }) => {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -309,7 +317,7 @@ const AssistantBlockCard = ({ title, text, showIndicator = false, isTextBlock = 
         <button
           onClick={handleCopy}
           className="mt-2 self-start flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-surface-tertiary text-ink-600 hover:bg-surface-secondary hover:text-accent transition-all duration-200"
-          title="Copy response in Markdown format"
+          title={t("eventCard.copyMarkdown")}
         >
           <svg className={`w-4 h-4 ${copied ? 'text-success' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {copied ? (
@@ -318,7 +326,7 @@ const AssistantBlockCard = ({ title, text, showIndicator = false, isTextBlock = 
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             )}
           </svg>
-          {copied ? 'Copied!' : 'Copy'}
+          {copied ? t("common.copied") : t("common.copy")}
         </button>
       )}
     </div>
@@ -340,6 +348,7 @@ const ToolUseCard = ({
   sessionId?: string;
   cwd?: string;
 }) => {
+  const { t } = useTranslation();
   if (messageContent.type !== "tool_use") return null;
   
   const toolStatus = useToolStatus(messageContent.id);
@@ -476,9 +485,9 @@ const ToolUseCard = ({
             <button
               onClick={handleViewDiff}
               className="shrink-0 text-xs font-medium text-accent hover:text-accent/80 px-2 py-1 rounded-md border border-accent/20 hover:border-accent/40 bg-accent/5 hover:bg-accent/10 transition-colors"
-              title="View diff"
+              title={t("eventCard.viewDiff")}
             >
-              View diff
+              {t("eventCard.viewDiff")}
             </button>
           )}
           {canExpand && (
@@ -519,6 +528,7 @@ const AskUserQuestionCard = ({
   permissionRequest?: PermissionRequest;
   onPermissionResult?: (toolUseId: string, result: PermissionResult) => void;
 }) => {
+  const { t } = useTranslation();
   if (messageContent.type !== "tool_use") return null;
   
   const input = messageContent.input as AskUserQuestionInput | null;
@@ -542,7 +552,7 @@ const AskUserQuestionCard = ({
     <div className="flex flex-col gap-2 rounded-[1rem] bg-surface-tertiary px-3 py-2 mt-4 overflow-hidden">
       <div className="flex flex-row items-center gap-2">
         <StatusDot variant="success" isActive={false} isVisible={true} />
-        <span className="inline-flex items-center rounded-md text-accent py-0.5 text-sm font-medium">AskUserQuestion</span>
+        <span className="inline-flex items-center rounded-md text-accent py-0.5 text-sm font-medium">{t("eventCard.askUserQuestion")}</span>
       </div>
       {questions.map((q, idx) => (
         <div key={idx} className="text-sm text-ink-700 ml-4">{q.question}</div>
@@ -552,6 +562,7 @@ const AskUserQuestionCard = ({
 };
 
 const SystemInfoCard = ({ message, showIndicator = false }: { message: SDKMessage; showIndicator?: boolean }) => {
+  const { t } = useTranslation();
   if (message.type !== "system" || !("subtype" in message)) return null;
 
   const systemMsg = message as any;
@@ -565,12 +576,12 @@ const SystemInfoCard = ({ message, showIndicator = false }: { message: SDKMessag
   }
 
   if (systemMsg.subtype === "notice") {
-    const noticeText = systemMsg.text || systemMsg.message || "System notice";
+    const noticeText = systemMsg.text || systemMsg.message || t("eventCard.systemNoticeFallback");
     return (
       <div className="flex flex-col gap-2">
         <div className="header text-accent flex items-center gap-2">
           <StatusDot variant="success" isActive={showIndicator} isVisible={showIndicator} />
-          System Notice
+          {t("eventCard.systemNotice")}
         </div>
         <div className="rounded-xl px-4 py-2 border border-ink-900/10 bg-surface-secondary text-sm text-ink-700">
           {noticeText}
@@ -592,13 +603,13 @@ const SystemInfoCard = ({ message, showIndicator = false }: { message: SDKMessag
     <div className="flex flex-col gap-2 overflow-hidden">
       <div className="header text-accent flex items-center gap-2">
         <StatusDot variant="success" isActive={showIndicator} isVisible={showIndicator} />
-        System Init
+        {t("eventCard.systemInit")}
       </div>
       <div className="flex flex-col rounded-xl px-4 py-2 border border-ink-900/10 bg-surface-secondary space-y-1">
-        <InfoItem name="Session ID" value={systemMsg.session_id || "-"} />
-        <InfoItem name="Model Name" value={systemMsg.model || "-"} />
-        <InfoItem name="Permission Mode" value={systemMsg.permissionMode || "-"} />
-        <InfoItem name="Working Directory" value={systemMsg.cwd || "-"} />
+        <InfoItem name={t("eventCard.sessionId")} value={systemMsg.session_id || "-"} />
+        <InfoItem name={t("eventCard.modelName")} value={systemMsg.model || "-"} />
+        <InfoItem name={t("eventCard.permissionMode")} value={systemMsg.permissionMode || "-"} />
+        <InfoItem name={t("eventCard.workingDirectory")} value={systemMsg.cwd || "-"} />
       </div>
     </div>
   );
@@ -646,6 +657,7 @@ const ImageZoomModal = ({
 // Attachment preview for displaying attached files in user messages
 /** Renders attached media (image, video, audio) in user messages */
 const AttachmentDisplay = ({ attachment, cwd }: { attachment: Attachment; cwd?: string }) => {
+  const { t } = useTranslation();
   const [isZoomed, setIsZoomed] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(attachment.dataUrl || null);
 
@@ -698,14 +710,14 @@ const AttachmentDisplay = ({ attachment, cwd }: { attachment: Attachment; cwd?: 
           {imageSrc ? (
             <img
               src={imageSrc}
-              alt={`Attached image: ${attachment.name}`}
+              alt={t("eventCard.attachedImageAlt", { name: attachment.name })}
               className="max-w-xs max-h-48 rounded-lg object-contain cursor-zoom-in hover:opacity-90 transition-opacity"
               onDoubleClick={() => setIsZoomed(true)}
-              title="Double-click to zoom"
+              title={t("eventCard.doubleClickToZoom")}
             />
           ) : (
             <div className="max-w-xs max-h-48 rounded-lg bg-surface-secondary border border-ink-900/10 p-3 text-xs text-muted">
-              Image preview unavailable
+              {t("eventCard.imagePreviewUnavailable")}
             </div>
           )}
           <div className="text-xs text-muted mt-1">{attachment.name}</div>
@@ -743,7 +755,7 @@ const AttachmentDisplay = ({ attachment, cwd }: { attachment: Attachment; cwd?: 
       <div className="mt-2">
         {videoError ? (
           <div className="max-w-xs p-3 bg-red-50 border border-red-200 rounded-lg">
-            <div className="text-sm text-red-700 mb-1">Failed to load video</div>
+            <div className="text-sm text-red-700 mb-1">{t("eventCard.videoLoadFailed")}</div>
             <div className="text-xs text-red-600">{attachment.name}</div>
             <div className="text-xs text-red-500 mt-1">{videoError}</div>
           </div>
@@ -752,24 +764,24 @@ const AttachmentDisplay = ({ attachment, cwd }: { attachment: Attachment; cwd?: 
             src={objectUrl || attachment.dataUrl}
             controls
             className="max-w-xs max-h-48 rounded-lg"
-            aria-label={`Video: ${attachment.name}`}
+            aria-label={t("eventCard.videoLabel", { name: attachment.name })}
             onError={(e) => {
               const target = e.target as HTMLVideoElement;
               const error = target.error;
-              let errorMsg = 'Unknown error';
+              let errorMsg = t("eventCard.unknownError");
               if (error) {
                 switch (error.code) {
                   case MediaError.MEDIA_ERR_ABORTED:
-                    errorMsg = 'Playback aborted';
+                    errorMsg = t("eventCard.playbackAborted");
                     break;
                   case MediaError.MEDIA_ERR_NETWORK:
-                    errorMsg = 'Network error';
+                    errorMsg = t("eventCard.networkError");
                     break;
                   case MediaError.MEDIA_ERR_DECODE:
-                    errorMsg = 'Decoding error - unsupported format';
+                    errorMsg = t("eventCard.decodingError");
                     break;
                   case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                    errorMsg = 'Video format not supported by browser';
+                    errorMsg = t("eventCard.videoNotSupported");
                     break;
                 }
               }
@@ -778,7 +790,7 @@ const AttachmentDisplay = ({ attachment, cwd }: { attachment: Attachment; cwd?: 
             }}
           >
             <track kind="captions" />
-            Your browser does not support the video element.
+            {t("eventCard.videoNotSupportedFallback")}
           </video>
         )}
         <div className="text-xs text-muted mt-1">{attachment.name}</div>
@@ -807,7 +819,7 @@ const AttachmentDisplay = ({ attachment, cwd }: { attachment: Attachment; cwd?: 
       <div className="mt-2">
         {audioError ? (
           <div className="max-w-xs p-3 bg-red-50 border border-red-200 rounded-lg">
-            <div className="text-sm text-red-700 mb-1">Failed to load audio</div>
+            <div className="text-sm text-red-700 mb-1">{t("eventCard.audioLoadFailed")}</div>
             <div className="text-xs text-red-600">{attachment.name}</div>
             <div className="text-xs text-red-500 mt-1">{audioError}</div>
           </div>
@@ -816,24 +828,24 @@ const AttachmentDisplay = ({ attachment, cwd }: { attachment: Attachment; cwd?: 
             src={objectUrl || attachment.dataUrl}
             controls
             className="max-w-xs"
-            aria-label={`Audio: ${attachment.name}`}
+            aria-label={t("eventCard.audioLabel", { name: attachment.name })}
             onError={(e) => {
               const target = e.target as HTMLAudioElement;
               const error = target.error;
-              let errorMsg = 'Unknown error';
+              let errorMsg = t("eventCard.unknownError");
               if (error) {
                 switch (error.code) {
                   case MediaError.MEDIA_ERR_ABORTED:
-                    errorMsg = 'Playback aborted';
+                    errorMsg = t("eventCard.playbackAborted");
                     break;
                   case MediaError.MEDIA_ERR_NETWORK:
-                    errorMsg = 'Network error';
+                    errorMsg = t("eventCard.networkError");
                     break;
                   case MediaError.MEDIA_ERR_DECODE:
-                    errorMsg = 'Decoding error - unsupported format';
+                    errorMsg = t("eventCard.decodingError");
                     break;
                   case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                    errorMsg = 'Audio format not supported by browser';
+                    errorMsg = t("eventCard.audioNotSupported");
                     break;
                 }
               }
@@ -841,7 +853,7 @@ const AttachmentDisplay = ({ attachment, cwd }: { attachment: Attachment; cwd?: 
               setAudioError(errorMsg);
             }}
           >
-            Your browser does not support the audio element.
+            {t("eventCard.audioNotSupportedFallback")}
           </audio>
         )}
         <div className="text-xs text-muted mt-1">{attachment.name}</div>
@@ -863,6 +875,7 @@ const UserMessageCard = ({
   onEdit?: (newPrompt: string) => void;
   sessionId?: string;
 }) => {
+  const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(message.prompt);
   const [copied, setCopied] = useState(false);
@@ -898,7 +911,7 @@ const UserMessageCard = ({
     <div className="flex flex-col mt-4 group overflow-hidden">
       <div className="header text-accent flex items-center gap-2">
         <StatusDot variant="success" isActive={showIndicator} isVisible={showIndicator} />
-        User
+        {t("eventCard.user")}
       </div>
       {isEditing ? (
         <div className="flex flex-col gap-2 mt-2">
@@ -913,13 +926,13 @@ const UserMessageCard = ({
               onClick={handleSave}
               className="px-4 py-2 rounded-md bg-accent text-white hover:bg-accent/90 transition-colors"
             >
-              Send
+              {t("common.send")}
             </button>
             <button
               onClick={handleCancel}
               className="px-4 py-2 rounded-md bg-surface-tertiary hover:bg-surface-secondary text-ink-700 transition-colors"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
           </div>
         </div>
@@ -928,7 +941,7 @@ const UserMessageCard = ({
           {hasPrompt ? (
             <MDContent text={message.prompt} />
           ) : (
-            <div className="mt-2 text-sm text-ink-600">User attached file(s).</div>
+            <div className="mt-2 text-sm text-ink-600">{t("eventCard.userAttachedFiles")}</div>
           )}
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-2">
@@ -947,13 +960,13 @@ const UserMessageCard = ({
                 onClick={() => setIsEditing(true)}
                 className="text-xs px-3 py-1.5 rounded-md text-ink-400 hover:text-accent hover:bg-surface-tertiary opacity-0 group-hover:opacity-100 transition-all duration-200"
               >
-                Edit
+                {t("common.edit")}
               </button>
             )}
             <button
               onClick={handleCopy}
               className="text-xs px-3 py-1.5 rounded-md text-ink-400 hover:text-accent hover:bg-surface-tertiary opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1.5"
-              title="Copy user message"
+              title={t("eventCard.copyUserMessage")}
             >
               <svg className={`w-4 h-4 ${copied ? 'text-success' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {copied ? (
@@ -962,7 +975,7 @@ const UserMessageCard = ({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 )}
               </svg>
-              {copied ? 'Copied!' : 'Copy'}
+              {copied ? t("common.copied") : t("common.copy")}
             </button>
           </div>
         </>
@@ -998,6 +1011,7 @@ export function MessageCard({
   onConfirmChanges?: (sessionId: string) => void;
   onRollbackChanges?: (sessionId: string) => void;
 }) {
+  const { t } = useTranslation();
   const showIndicator = isLast && isRunning;
   if ((message as any).type === "system_summary") {
     return null;
@@ -1031,11 +1045,15 @@ export function MessageCard({
     const canRetry = Boolean(onRetry && retryable && !isRunning);
     return (
       <div className="flex flex-col gap-2 mt-4">
-        <div className="header text-error">Session Error</div>
+        <div className="header text-error">{t("eventCard.sessionError")}</div>
         <div className="rounded-xl bg-error-light p-3">
           <pre className="text-sm text-error whitespace-pre-wrap">{JSON.stringify(sdkMessage, null, 2)}</pre>
           {retryAttempts ? (
-            <div className="mt-2 text-xs text-error/80">Auto-retry failed after {retryAttempts} attempt{retryAttempts === 1 ? '' : 's'}.</div>
+            <div className="mt-2 text-xs text-error/80">
+              {retryAttempts === 1
+                ? t("eventCard.autoRetryFailedOne")
+                : t("eventCard.autoRetryFailedMany", { count: retryAttempts })}
+            </div>
           ) : null}
           {canRetry ? (
             <button
@@ -1043,7 +1061,7 @@ export function MessageCard({
               onClick={() => onRetry?.(retryPrompt)}
               disabled={!canRetry}
             >
-              Retry
+              {t("common.retry")}
             </button>
           ) : null}
         </div>
@@ -1061,10 +1079,10 @@ export function MessageCard({
           const key = content.type === 'tool_use' ? `tool_use_${(content as any).id}` : `content_${idx}`;
           
           if (content.type === "thinking") {
-            return <AssistantBlockCard key={key} title="Thinking" text={content.thinking} showIndicator={isLastContent && showIndicator} isTextBlock={false} />;
+            return <AssistantBlockCard key={key} title={t("eventCard.thinking")} text={content.thinking} showIndicator={isLastContent && showIndicator} isTextBlock={false} />;
           }
           if (content.type === "text") {
-            return <AssistantBlockCard key={key} title="Assistant" text={content.text} showIndicator={isLastContent && showIndicator} isTextBlock={true} />;
+            return <AssistantBlockCard key={key} title={t("eventCard.assistant")} text={content.text} showIndicator={isLastContent && showIndicator} isTextBlock={true} />;
           }
           if (content.type === "tool_use") {
             if (content.name === "AskUserQuestion") {

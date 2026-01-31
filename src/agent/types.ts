@@ -39,6 +39,7 @@ export type ApiSettings = {
   enableImageTools?: boolean; // Enable attach_image tool
   useGitForDiff?: boolean; // Use git for diff (true) or file snapshots (false)
   llmProviders?: LLMProviderSettings; // LLM providers and models configuration
+  language?: 'auto' | 'en' | 'zh-CN'; // UI language preference
 
   // If set, new sessions created without a workspace folder will use:
   //   {conversationDataDir}/{sessionId}

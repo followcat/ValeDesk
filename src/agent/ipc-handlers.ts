@@ -7,7 +7,7 @@ import type { SessionHistoryPage } from "./libs/session-store.js";
 import { SchedulerStore } from "./libs/scheduler-store.js";
 import { SchedulerService } from "./libs/scheduler-service.js";
 import { loadApiSettings, saveApiSettings } from "./libs/settings-store.js";
-import { generateSessionTitle } from "./libs/util.js";
+import { generateSessionTitle, DEFAULT_SESSION_TITLE } from "./libs/util.js";
 import { app } from "electron";
 import { join, resolve, relative } from "path";
 import { sessionManager } from "./session-manager.js";
@@ -640,10 +640,10 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
       payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd, model: session.model }
     });
 
-    if (session.title === "New Chat" && event.payload.prompt) {
+    if (session.title === DEFAULT_SESSION_TITLE && event.payload.prompt) {
       generateSessionTitle(event.payload.prompt, session.model)
         .then((newTitle) => {
-          if (newTitle && newTitle !== "New Chat") {
+          if (newTitle && newTitle !== DEFAULT_SESSION_TITLE) {
             sessions.updateSession(session.id, { title: newTitle });
             const updated = sessions.getSession(session.id);
             sessionManager.emitToWindow(windowId, {
@@ -719,11 +719,11 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
     
     // Generate title for empty chats on first real prompt
     let sessionTitle = session.title;
-    if (isFirstRun && session.title === "New Chat" && event.payload.prompt) {
+    if (isFirstRun && session.title === DEFAULT_SESSION_TITLE && event.payload.prompt) {
       // Generate title asynchronously but don't block
       generateSessionTitle(event.payload.prompt, session.model)
         .then((newTitle) => {
-          if (newTitle && newTitle !== "New Chat") {
+          if (newTitle && newTitle !== DEFAULT_SESSION_TITLE) {
             sessions.updateSession(session.id, { title: newTitle });
             emit({
               type: "session.status",

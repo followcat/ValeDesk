@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import { useIPC } from "./hooks/useIPC";
 import { useAppStore } from "./store/useAppStore";
@@ -16,8 +17,10 @@ import { TodoPanel } from "./components/TodoPanel";
 import MDContent from "./render/markdown";
 import { getPlatform } from "./platform";
 import { basenameFsPath } from "./platform/fs-path";
+import { applyLanguageSetting } from "./i18n";
 
 function App() {
+  const { t } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const partialMessageRef = useRef("");
@@ -119,6 +122,7 @@ function App() {
     // Handle settings loaded event
     if (event.type === "settings.loaded") {
       setApiSettings(event.payload.settings);
+      applyLanguageSetting(event.payload.settings?.language);
       setSettingsLoaded(true);
     }
     
@@ -322,7 +326,7 @@ function App() {
   const handleRetry = useCallback((retryPrompt?: string) => {
     if (!activeSessionId) return;
     if (isRunning) {
-      setGlobalError("Session is still running. Please wait for it to finish.");
+      setGlobalError(t("app.sessionRunningError"));
       return;
     }
 
@@ -335,7 +339,7 @@ function App() {
     })();
 
     if (!lastPrompt) {
-      setGlobalError("No prompt available to retry.");
+      setGlobalError(t("app.noPromptToRetry"));
       return;
     }
 
@@ -348,11 +352,12 @@ function App() {
         retryReason: "manual"
       }
     });
-  }, [activeSessionId, isRunning, messages, sendEvent, setGlobalError]);
+  }, [activeSessionId, isRunning, messages, sendEvent, setGlobalError, t]);
 
   const handleSaveSettings = useCallback((settings: ApiSettings) => {
     sendEvent({ type: "settings.save", payload: { settings } });
     setApiSettings(settings);
+    applyLanguageSetting(settings.language);
   }, [sendEvent]);
 
   const handleConfirmChanges = useCallback((sessionId: string) => {
@@ -394,7 +399,7 @@ function App() {
                 onClick={() => setShowSessionEditModal(true)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium bg-ink-900/5 border border-ink-900/10 text-ink-600 rounded-lg hover:bg-ink-100 transition-colors"
                 style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                title="Edit session settings"
+                title={t("app.editSessionSettings")}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -411,7 +416,7 @@ function App() {
                   : 'bg-ink-900/5 border-ink-900/10 text-ink-500'
               }`}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              title={autoScrollEnabled ? 'Auto scroll enabled' : 'Auto scroll disabled'}
+              title={autoScrollEnabled ? t("app.autoScrollEnabled") : t("app.autoScrollDisabled")}
             >
               <svg className={`w-4 h-4 transition-transform ${autoScrollEnabled ? 'text-info' : 'text-ink-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
@@ -432,7 +437,7 @@ function App() {
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent/10 border border-accent/30 text-accent rounded-lg hover:bg-accent/20 transition-colors"
                 style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                title="Set workspace folder to enable file operations"
+                title={t("app.setWorkspaceHint")}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -465,7 +470,7 @@ function App() {
                   }}
                   className="flex items-center justify-center w-8 h-8 text-ink-600 bg-white border border-l-0 border-ink-900/10 rounded-r-lg hover:bg-ink-50 hover:text-ink-900 transition-colors"
                   style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  title="Open in file manager"
+                  title={t("app.openInFileManager")}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
