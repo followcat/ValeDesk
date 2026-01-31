@@ -347,6 +347,9 @@ fn handle_session_sync(db: &Arc<Database>, payload: &Value) {
         model: data.get("model").and_then(|v| v.as_str()).map(String::from),
         input_tokens: data.get("inputTokens").and_then(|v| v.as_i64()),
         output_tokens: data.get("outputTokens").and_then(|v| v.as_i64()),
+        charter: data.get("charter").cloned(),
+        charter_hash: data.get("charterHash").and_then(|v| v.as_str()).map(String::from),
+        adrs: data.get("adrs").cloned(),
         ..Default::default()
       };
       if let Err(e) = db.update_session(session_id, &params) {
@@ -1345,6 +1348,9 @@ fn client_event(app: tauri::AppHandle, state: tauri::State<'_, AppState>, event:
               "todos": history.todos,
               "model": history.session.model,
               "fileChanges": history.file_changes,
+              "charter": history.session.charter,
+              "charterHash": history.session.charter_hash,
+              "adrs": history.session.adrs,
               "hasMore": false,
               "page": "initial"
             }

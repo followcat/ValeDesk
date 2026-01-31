@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ServerEvent, SessionStatus, StreamMessage, TodoItem, FileChange, MultiThreadTask, LLMModel, LLMProvider, LLMProviderSettings, ApiSettings, Attachment } from "../types";
+import type { CharterData, ADRItem } from "../../agent/types";
 import { getPlatform } from "../platform";
 
 export type PermissionRequest = {
@@ -33,6 +34,9 @@ export type SessionView = {
   historyLoading?: boolean;
   historyLoadType?: "initial" | "prepend";
   historyLoadId?: number;
+  charter?: CharterData;
+  charterHash?: string;
+  adrs?: ADRItem[];
 };
 
 interface AppState {
@@ -236,7 +240,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       case "session.history": {
-        const { sessionId, messages, status, inputTokens, outputTokens, todos, model, fileChanges, hasMore, nextCursor, page } = event.payload;
+        const { sessionId, messages, status, inputTokens, outputTokens, todos, model, fileChanges, hasMore, nextCursor, page, charter, charterHash, adrs } = event.payload;
         set((state) => {
           const existing = state.sessions[sessionId] ?? createSession(sessionId);
           const loadType = page ?? "initial";
@@ -293,7 +297,11 @@ export const useAppStore = create<AppState>((set, get) => ({
                 historyCursor: nextCursor ?? existing.historyCursor,
                 historyLoading: false,
                 historyLoadType: loadType,
-                historyLoadId: (existing.historyLoadId ?? 0) + 1
+                historyLoadId: (existing.historyLoadId ?? 0) + 1,
+                // Load charter and ADRs from DB
+                charter: charter ?? existing.charter,
+                charterHash: charterHash ?? existing.charterHash,
+                adrs: adrs ?? existing.adrs
               }
             }
           };
