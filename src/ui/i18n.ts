@@ -39,6 +39,13 @@ const resolveDetectedLanguage = (): string => {
 
 export const applyLanguageSetting = (language?: string): void => {
   if (!language || language === 'auto') {
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage?.removeItem('i18nextLng');
+      } catch {
+        // Ignore storage access errors (e.g. privacy mode).
+      }
+    }
     const detected = resolveDetectedLanguage();
     if (detected && detected !== i18n.language) {
       void i18n.changeLanguage(detected);
