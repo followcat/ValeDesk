@@ -123,6 +123,9 @@ export type SessionInfo = {
   outputTokens?: number;
   model?: string;
   threadId?: string; // Thread ID for multi-thread sessions
+  // Charter system fields
+  charter?: CharterData;  // Session charter (scope/constraints)
+  charterHash?: string;   // Hash for change detection
 };
 
 // Todo item type
@@ -141,6 +144,51 @@ export interface FileChange {
   deletions: number;         // Number of lines deleted
   status: ChangeStatus;      // 'pending' = can be rolled back, 'confirmed' = cannot rollback
   commitHash?: string;       // Commit hash for showing commit-level diffs
+}
+
+// ============================================================
+// Charter System Types (Phase 1)
+// ============================================================
+
+// Single charter item with unique ID
+export interface CharterItem {
+  id: string;         // Unique identifier (e.g., "goal-001", "constraint-002")
+  content: string;    // The actual text content
+}
+
+// Charter data structure - defines session scope and constraints
+export interface CharterData {
+  // Core goal definition
+  goal: CharterItem;              // Primary objective (required)
+  nonGoals?: CharterItem[];       // Explicitly out of scope items
+  
+  // Acceptance criteria
+  definitionOfDone: CharterItem[]; // Must be met for session to be "complete"
+  
+  // Constraints and invariants
+  constraints?: CharterItem[];     // Soft constraints (can be overridden with ADR)
+  invariants?: CharterItem[];      // Hard constraints (NEVER violate)
+  
+  // Context
+  glossary?: Record<string, string>; // Domain-specific terminology
+  
+  // Metadata
+  version?: number;                // Charter version (increments on change)
+  createdAt?: number;              // Creation timestamp
+  updatedAt?: number;              // Last update timestamp
+}
+
+// Charter hash for change detection
+export function computeCharterHash(charter: CharterData): string {
+  // Create a stable JSON representation (sorted keys)
+  const stableJson = JSON.stringify(charter, Object.keys(charter).sort());
+  // Simple hash using djb2 algorithm
+  let hash = 5381;
+  for (let i = 0; i < stableJson.length; i++) {
+    hash = ((hash << 5) + hash) + stableJson.charCodeAt(i);
+    hash = hash >>> 0; // Convert to unsigned 32-bit
+  }
+  return hash.toString(16).padStart(8, '0');
 }
 
 // ============================================================

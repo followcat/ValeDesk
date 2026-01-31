@@ -42,6 +42,38 @@ export interface FileChange {
 }
 
 // ============================================================
+// Charter System Types (Phase 1)
+// ============================================================
+
+// Single charter item with unique ID
+export interface CharterItem {
+  id: string;         // Unique identifier (e.g., "goal-001", "constraint-002")
+  content: string;    // The actual text content
+}
+
+// Charter data structure - defines session scope and constraints
+export interface CharterData {
+  // Core goal definition
+  goal: CharterItem;              // Primary objective (required)
+  nonGoals?: CharterItem[];       // Explicitly out of scope items
+  
+  // Acceptance criteria
+  definitionOfDone: CharterItem[]; // Must be met for session to be "complete"
+  
+  // Constraints and invariants
+  constraints?: CharterItem[];     // Soft constraints (can be overridden with ADR)
+  invariants?: CharterItem[];      // Hard constraints (NEVER violate)
+  
+  // Context
+  glossary?: Record<string, string>; // Domain-specific terminology
+  
+  // Metadata
+  version?: number;                // Charter version (increments on change)
+  createdAt?: number;              // Creation timestamp
+  updatedAt?: number;              // Last update timestamp
+}
+
+// ============================================================
 // Preview System Types (Phase 4.4-4.7)
 // ============================================================
 
@@ -130,6 +162,9 @@ export type SessionInfo = {
   inputTokens?: number;
   outputTokens?: number;
   threadId?: string; // Thread ID for multi-thread sessions
+  // Charter system fields
+  charter?: CharterData;  // Session charter (scope/constraints)
+  charterHash?: string;   // Hash for change detection
 };
 
 export type ThreadInfo = {

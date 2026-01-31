@@ -5,7 +5,7 @@
  */
 
 import crypto from "crypto";
-import type { SessionStatus, StreamMessage, FileChange } from "../agent/types.js";
+import type { SessionStatus, StreamMessage, FileChange, CharterData } from "../agent/types.js";
 
 export type PendingPermission = {
   toolUseId: string;
@@ -31,6 +31,9 @@ export type Session = {
   abortController?: AbortController;
   inputTokens?: number;
   outputTokens?: number;
+  // Charter system fields
+  charter?: CharterData;
+  charterHash?: string;
 };
 
 export type StoredSession = {
@@ -50,6 +53,9 @@ export type StoredSession = {
   outputTokens?: number;
   enableSessionGitRepo?: boolean; // Per-session git versioning setting
   fileChanges?: FileChange[];
+  // Charter system fields
+  charter?: CharterData;
+  charterHash?: string;
 };
 
 export type TodoItem = {

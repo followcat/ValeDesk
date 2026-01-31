@@ -123,6 +123,16 @@ impl Database {
             [],
         ); // Ignore error if column already exists
 
+        // Migration: add charter system columns if not exists
+        let _ = conn.execute(
+            "ALTER TABLE sessions ADD COLUMN charter TEXT",
+            [],
+        ); // Ignore error if column already exists
+        let _ = conn.execute(
+            "ALTER TABLE sessions ADD COLUMN charter_hash TEXT",
+            [],
+        ); // Ignore error if column already exists
+
         Ok(())
     }
 
@@ -167,6 +177,8 @@ impl Database {
             output_tokens: 0,
             created_at: now,
             updated_at: now,
+            charter: None,
+            charter_hash: None,
         })
     }
 
@@ -174,11 +186,15 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             r#"SELECT id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, 
-                      model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, created_at, updated_at
+                      model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, created_at, updated_at,
+                      charter, charter_hash
                FROM sessions ORDER BY updated_at DESC"#
         )?;
 
         let rows = stmt.query_map([], |row| {
+            let charter_str: Option<String> = row.get(16)?;
+            let charter = charter_str.and_then(|s| serde_json::from_str(&s).ok());
+            
             Ok(Session {
                 id: row.get(0)?,
                 title: row.get(1)?,
@@ -196,6 +212,8 @@ impl Database {
                 output_tokens: row.get(13)?,
                 created_at: row.get(14)?,
                 updated_at: row.get(15)?,
+                charter,
+                charter_hash: row.get(17)?,
             })
         })?;
 
@@ -206,11 +224,15 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             r#"SELECT id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, 
-                      model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, created_at, updated_at
+                      model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, created_at, updated_at,
+                      charter, charter_hash
                FROM sessions WHERE id = ?1"#
         )?;
 
         let mut rows = stmt.query_map([id], |row| {
+            let charter_str: Option<String> = row.get(16)?;
+            let charter = charter_str.and_then(|s| serde_json::from_str(&s).ok());
+            
             Ok(Session {
                 id: row.get(0)?,
                 title: row.get(1)?,
@@ -228,6 +250,8 @@ impl Database {
                 output_tokens: row.get(13)?,
                 created_at: row.get(14)?,
                 updated_at: row.get(15)?,
+                charter,
+                charter_hash: row.get(17)?,
             })
         })?;
 
@@ -283,6 +307,16 @@ impl Database {
         if let Some(output_tokens) = params.output_tokens {
             updates.push(format!("output_tokens = ?{}", idx));
             values.push(Box::new(output_tokens));
+            idx += 1;
+        }
+        if let Some(ref charter) = params.charter {
+            updates.push(format!("charter = ?{}", idx));
+            values.push(Box::new(serde_json::to_string(charter).unwrap_or_default()));
+            idx += 1;
+        }
+        if let Some(ref charter_hash) = params.charter_hash {
+            updates.push(format!("charter_hash = ?{}", idx));
+            values.push(Box::new(charter_hash.clone()));
             idx += 1;
         }
 
@@ -528,6 +562,11 @@ pub struct Session {
     pub output_tokens: i64,
     pub created_at: i64,
     pub updated_at: i64,
+    // Charter system fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub charter: Option<serde_json::Value>,  // JSON blob for CharterData
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub charter_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -571,6 +610,11 @@ pub struct UpdateSessionParams {
     pub input_tokens: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_tokens: Option<i64>,
+    // Charter system fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub charter: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub charter_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

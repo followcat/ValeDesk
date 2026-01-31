@@ -2,6 +2,8 @@
  * Base interfaces for all tools
  */
 
+import type { CharterData } from '../../types.js';
+
 export interface ToolDefinition {
   type: "function";
   function: {
@@ -27,6 +29,7 @@ export interface ToolExecutionContext {
   isPathSafe: (path: string) => boolean;
   sessionId?: string;
   onTodosChanged?: (todos: any[]) => void;
+  onCharterChanged?: (charter: CharterData, hash: string) => void;
 }
 
 export abstract class BaseTool {
