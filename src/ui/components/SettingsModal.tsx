@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { Trans, useTranslation } from "react-i18next";
 import type { 
   ApiSettings, 
   WebSearchProvider, 
@@ -14,6 +15,7 @@ import type {
 import { SkillsTab } from "./SkillsTab";
 import { getPlatform } from "../platform";
 import { useAppStore } from "../store/useAppStore";
+import { applyLanguageSetting } from "../i18n";
 
 type SettingsModalProps = {
   onClose: () => void;
@@ -21,9 +23,10 @@ type SettingsModalProps = {
   currentSettings: ApiSettings | null;
 };
 
-type TabId = 'llm-models' | 'web-tools' | 'tools' | 'skills' | 'memory-mode';
+type TabId = 'llm-models' | 'web-tools' | 'tools' | 'language' | 'skills' | 'memory-mode';
 
 export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModalProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>('llm-models');
   
   // Original API settings state
@@ -53,6 +56,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
   const [conversationDataDir, setConversationDataDir] = useState(currentSettings?.conversationDataDir || "");
   const [useGitForDiff, setUseGitForDiff] = useState(currentSettings?.useGitForDiff ?? true);
   const [enableSessionGitRepo, setEnableSessionGitRepo] = useState(currentSettings?.enableSessionGitRepo ?? false);
+  const [language, setLanguage] = useState<ApiSettings["language"]>(currentSettings?.language || "auto");
   const [sessionGitChecking, setSessionGitChecking] = useState(false);
   const [sessionGitError, setSessionGitError] = useState<string | null>(null);
   const [memoryLoading, setMemoryLoading] = useState(false);
@@ -105,7 +109,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
     } finally {
       setMemoryLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const handleSessionGitToggle = useCallback(async (nextEnabled: boolean) => {
     if (!nextEnabled) {
@@ -122,12 +126,12 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
         setEnableSessionGitRepo(true);
       } else {
         setEnableSessionGitRepo(false);
-        setSessionGitError("Git was not found. Install Git to enable session repositories.");
+        setSessionGitError(t("settings.sessionGit.notFound"));
       }
     } catch (error) {
       console.error("[SettingsModal] Failed to check Git availability:", error);
       setEnableSessionGitRepo(false);
-      setSessionGitError("Failed to check Git availability.");
+      setSessionGitError(t("settings.sessionGit.checkFailed"));
     } finally {
       setSessionGitChecking(false);
     }
@@ -166,6 +170,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       setConversationDataDir(currentSettings.conversationDataDir || "");
       setUseGitForDiff(currentSettings.useGitForDiff ?? true);
       setEnableSessionGitRepo(currentSettings.enableSessionGitRepo ?? false);
+      setLanguage(currentSettings.language || "auto");
       setSessionGitChecking(false);
       setSessionGitError(null);
     }
@@ -290,7 +295,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
     
     if (enableMemory) {
       if (memoryLoading) {
-        setMemoryError("Memory is still loading. Please try again in a moment.");
+        setMemoryError(t("settings.memory.stillLoading"));
         return;
       }
       if (memoryDirty) {
@@ -330,6 +335,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       enableFetchTools,
       enableImageTools,
       useGitForDiff,
+      language,
       llmProviders: llmProviderSettings,
       conversationDataDir: conversationDataDir.trim() || undefined,
       enableSessionGitRepo
@@ -374,9 +380,16 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
     setConversationDataDir("");
     setUseGitForDiff(true);
     setEnableSessionGitRepo(false);
+    setLanguage("auto");
+    applyLanguageSetting("auto");
     setSessionGitChecking(false);
     setSessionGitError(null);
   };
+
+  const handleLanguageChange = useCallback((nextLanguage: ApiSettings["language"]) => {
+    setLanguage(nextLanguage);
+    applyLanguageSetting(nextLanguage);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -396,7 +409,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] rounded-2xl border border-ink-900/10 bg-surface shadow-2xl flex flex-col">
           <div className="px-6 pt-6 pb-4 border-b border-ink-900/10">
             <Dialog.Title className="text-xl font-semibold text-ink-900">
-              Settings
+              {t("settings.title")}
             </Dialog.Title>
           </div>
 
@@ -409,7 +422,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
                   : 'text-ink-600 hover:text-ink-900'
               }`}
             >
-              LLM & Models
+              {t("settings.tabs.llmModels")}
             </button>
             <button
               onClick={() => setActiveTab('web-tools')}
@@ -419,7 +432,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
                   : 'text-ink-600 hover:text-ink-900'
               }`}
             >
-              Web Reader & Search
+              {t("settings.tabs.webTools")}
             </button>
             <button
               onClick={() => setActiveTab('tools')}
@@ -429,7 +442,17 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
                   : 'text-ink-600 hover:text-ink-900'
               }`}
             >
-              Tools
+              {t("settings.tabs.tools")}
+            </button>
+            <button
+              onClick={() => setActiveTab('language')}
+              className={`px-5 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === 'language'
+                  ? 'text-ink-900 border-b-2 border-accent'
+                  : 'text-ink-600 hover:text-ink-900'
+              }`}
+            >
+              {t("settings.tabs.language")}
             </button>
             <button
               onClick={() => setActiveTab('skills')}
@@ -439,7 +462,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
                   : 'text-ink-600 hover:text-ink-900'
               }`}
             >
-              Skills
+              {t("settings.tabs.skills")}
             </button>
             <button
               onClick={() => setActiveTab('memory-mode')}
@@ -449,7 +472,7 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
                   : 'text-ink-600 hover:text-ink-900'
               }`}
             >
-              Memory & Mode
+              {t("settings.tabs.memoryMode")}
             </button>
           </div>
 
@@ -510,6 +533,11 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
                 sessionGitError={sessionGitError}
                 onToggleSessionGitRepo={handleSessionGitToggle}
               />
+            ) : activeTab === 'language' ? (
+              <LanguageTab
+                language={language}
+                onLanguageChange={handleLanguageChange}
+              />
             ) : activeTab === 'skills' ? (
               <div className="p-6">
                 <SkillsTab
@@ -543,19 +571,19 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
               onClick={handleReset}
               className="flex-1 px-4 py-2.5 text-sm font-medium text-ink-600 bg-ink-50 rounded-lg hover:bg-ink-100 transition-colors"
             >
-              Reset
+              {t("common.reset")}
             </button>
             <button
               onClick={onClose}
               className="flex-1 px-4 py-2.5 text-sm font-medium text-ink-600 bg-ink-50 rounded-lg hover:bg-ink-100 transition-colors"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               onClick={handleSave}
               className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-ink-900 rounded-lg hover:bg-ink-800 transition-colors"
             >
-              Save
+              {t("common.save")}
             </button>
           </div>
         </Dialog.Content>
@@ -589,6 +617,7 @@ function LLMModelsTab({
   setLlmProviders: (providers: LLMProvider[]) => void;
   setLlmModels: (models: LLMModel[]) => void;
 }) {
+  const { t } = useTranslation();
   const [showOnlyEnabled, setShowOnlyEnabled] = useState(false);
   const [providerSearchQueries, setProviderSearchQueries] = useState<Record<string, string>>({});
   const [collapsedProviders, setCollapsedProviders] = useState<Record<string, boolean>>({});
@@ -630,7 +659,7 @@ function LLMModelsTab({
   return (
       <div className="px-6 py-4 space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium text-ink-900">LLM Providers</h3>
+        <h3 className="text-lg font-medium text-ink-900">{t("settings.llmProviders.title")}</h3>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowOnlyEnabled(!showOnlyEnabled)}
@@ -640,7 +669,7 @@ function LLMModelsTab({
                 : 'bg-ink-100 text-ink-600 hover:bg-ink-200'
             }`}
           >
-            Only enabled
+            {t("settings.llmProviders.onlyEnabled")}
           </button>
           <AddProviderButton 
             onAdd={onReloadProviders} 
@@ -661,7 +690,7 @@ function LLMModelsTab({
       {providers.length === 0 ? (
         <div className="p-6 bg-ink-50 rounded-lg border-2 border-dashed border-ink-200 text-center">
           <p className="text-sm text-ink-600 mb-2">
-            No providers added. Add your first provider to get started.
+            {t("settings.llmProviders.emptyState")}
           </p>
         </div>
       ) : (
@@ -709,7 +738,7 @@ function LLMModelsTab({
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-ink-600">
-                      {enabledModelsCount}/{providerModels.length} models
+                      {t("settings.llmProviders.modelsCount", { enabled: enabledModelsCount, total: providerModels.length })}
                     </span>
                     <button
                       onClick={(e) => {
@@ -718,7 +747,7 @@ function LLMModelsTab({
                       }}
                       disabled={loading}
                       className="p-2 hover:bg-ink-200 rounded transition-colors disabled:opacity-50"
-                      title="Load models"
+                      title={t("settings.llmProviders.loadModels")}
                     >
                       <svg className="w-4 h-4 text-ink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -730,7 +759,7 @@ function LLMModelsTab({
                         onDeleteProvider(provider.id);
                       }}
                       className="p-2 hover:bg-red-100 rounded transition-colors text-red-600"
-                      title="Delete provider"
+                      title={t("settings.llmProviders.deleteProvider")}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -747,7 +776,7 @@ function LLMModelsTab({
                           type="text"
                           value={searchQuery}
                           onChange={(e) => handleProviderSearchChange(provider.id, e.target.value)}
-                          placeholder="Search models..."
+                          placeholder={t("settings.llmProviders.searchModelsPlaceholder")}
                           className="w-full px-3 py-2 text-sm border border-ink-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20"
                         />
                       </div>
@@ -784,7 +813,9 @@ function LLMModelsTab({
                       {filteredModels.length === 0 && (
                         <div className="text-center py-4">
                           <p className="text-sm text-ink-500">
-                            {searchQuery || showOnlyEnabled ? 'No matching models found' : 'No models available'}
+                            {searchQuery || showOnlyEnabled
+                              ? t("settings.llmProviders.noMatchingModels")
+                              : t("settings.llmProviders.noModelsAvailable")}
                           </p>
                         </div>
                       )}
@@ -795,7 +826,7 @@ function LLMModelsTab({
                 {providerModels.length === 0 && (
                   <div className="px-4 py-6 text-center min-h-[100px] flex flex-col items-center justify-center">
                     <p className="text-sm text-ink-500 mb-2">
-                      No loaded models
+                      {t("settings.llmProviders.noLoadedModels")}
                     </p>
                     <button
                       onClick={(e) => {
@@ -805,7 +836,7 @@ function LLMModelsTab({
                       disabled={loading}
                       className="text-sm text-accent hover:underline disabled:opacity-50"
                     >
-                      {loading ? 'Loading...' : 'Load models'}
+                      {loading ? t("settings.llmProviders.loading") : t("settings.llmProviders.loadModels")}
                     </button>
                   </div>
                 )}
@@ -825,6 +856,7 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
   setLlmProviders: (providers: LLMProvider[]) => void;
   setLlmModels: (models: LLMModel[]) => void;
 }) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [type, setType] = useState<LLMProviderType>('openai');
   const [name, setName] = useState('');
@@ -862,12 +894,12 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
 
     // API key not required for Claude Code
     if (type !== 'claude-code' && !apiKey.trim()) {
-      setError('API key is required');
+      setError(t("settings.llmProviders.errors.apiKeyRequired"));
       setTesting(false);
       return;
     }
     if (type === 'openai' && !baseUrl.trim()) {
-      setError('Base URL is required');
+      setError(t("settings.llmProviders.errors.baseUrlRequired"));
       setTesting(false);
       return;
     }
@@ -876,7 +908,7 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
     const tempProvider: LLMProvider = {
       id: `temp-${Date.now()}`,
       type,
-      name: name.trim() || 'Test Provider',
+      name: name.trim() || t("settings.llmProviders.testProvider"),
       apiKey: type === 'claude-code' ? '' : apiKey.trim(),
       baseUrl: type === 'openrouter' || type === 'claude-code' ? undefined : (type === 'zai' ? baseUrl.trim() : baseUrl.trim()),
       zaiApiPrefix: type === 'zai' ? zaiApiPrefix : undefined,
@@ -900,7 +932,7 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
       } else if (event.type === "llm.models.error" && event.payload.providerId === tempProvider.id) {
         setTesting(false);
         setTestSuccess(false);
-        setError(`Connection failed: ${event.payload.message}`);
+        setError(t("settings.llmProviders.errors.connectionFailed", { message: event.payload.message }));
         removeListener();
       }
     });
@@ -909,7 +941,7 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
     setTimeout(() => {
       if (testing) {
         setTesting(false);
-        setError('Connection timeout - please check your settings');
+        setError(t("settings.llmProviders.errors.connectionTimeout"));
         removeListener();
       }
     }, 30000);
@@ -920,16 +952,16 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
     setError('');
 
     if (!name.trim()) {
-      setError('Provider name is required');
+      setError(t("settings.llmProviders.errors.nameRequired"));
       return;
     }
     // API key not required for Claude Code
     if (type !== 'claude-code' && !apiKey.trim()) {
-      setError('API key is required');
+      setError(t("settings.llmProviders.errors.apiKeyRequired"));
       return;
     }
     if (type === 'openai' && !baseUrl.trim()) {
-      setError('Base URL is required');
+      setError(t("settings.llmProviders.errors.baseUrlRequired"));
       return;
     }
 
@@ -997,41 +1029,41 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
         onClick={() => setIsOpen(true)}
         className="px-4 py-2 text-sm font-medium text-white bg-accent rounded-lg hover:bg-accent/90 transition-colors"
       >
-        + Add Provider
+        {t("settings.llmProviders.addProviderButton")}
       </button>
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <h3 className="text-lg font-semibold text-ink-900 mb-4">Add Provider</h3>
+            <h3 className="text-lg font-semibold text-ink-900 mb-4">{t("settings.llmProviders.addProviderTitle")}</h3>
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-ink-700 mb-2">
-                  Provider Type
+                  {t("settings.llmProviders.providerType")}
                 </label>
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value as LLMProviderType)}
                   className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20"
                 >
-                  <option value="openai">OpenAI</option>
-                  <option value="openrouter">OpenRouter</option>
-                  <option value="zai">Z.AI</option>
-                  <option value="claude-code">Claude Code (Subscription)</option>
+                  <option value="openai">{t("settings.llmProviders.providerOpenAI")}</option>
+                  <option value="openrouter">{t("settings.llmProviders.providerOpenRouter")}</option>
+                  <option value="zai">{t("settings.llmProviders.providerZai")}</option>
+                  <option value="claude-code">{t("settings.llmProviders.providerClaudeCode")}</option>
                 </select>
               </div>
 
               {type === 'openai' && (
                 <div>
                   <label className="block text-sm font-medium text-ink-700 mb-2">
-                    Base URL
+                    {t("settings.llmProviders.baseUrl")}
                   </label>
                   <input
                     type="text"
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder="https://api.openai.com/v1"
+                    placeholder={t("settings.llmProviders.baseUrlPlaceholder")}
                     className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20"
                   />
                 </div>
@@ -1040,15 +1072,15 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
               {type === 'zai' && (
                 <div>
                   <label className="block text-sm font-medium text-ink-700 mb-2">
-                    Endpoint
+                    {t("settings.llmProviders.endpoint")}
                   </label>
                   <select
                     value={zaiApiPrefix}
                     onChange={(e) => setZaiApiPrefix(e.target.value as 'default' | 'coding')}
                     className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20"
                   >
-                    <option value="default">Default (https://api.z.ai/api/paas/v4)</option>
-                    <option value="coding">Coding (https://api.z.ai/api/coding/paas/v4)</option>
+                    <option value="default">{t("settings.llmProviders.endpointDefault")}</option>
+                    <option value="coding">{t("settings.llmProviders.endpointCoding")}</option>
                   </select>
                 </div>
               )}
@@ -1057,13 +1089,13 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
               {type !== 'claude-code' && (
                 <div>
                   <label className="block text-sm font-medium text-ink-700 mb-2">
-                    API Key
+                    {t("settings.llmProviders.apiKey")}
                   </label>
                   <input
                     type="password"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk-..."
+                    placeholder={t("settings.llmProviders.apiKeyPlaceholder")}
                     className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20"
                   />
                 </div>
@@ -1073,8 +1105,13 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
               {type === 'claude-code' && (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <p className="text-sm text-amber-800">
-                    <strong>Claude Code Subscription</strong><br />
-                    Uses your Claude Code CLI subscription. Make sure you're logged in via <code className="bg-amber-100 px-1 rounded">claude login</code>.
+                    <Trans
+                      i18nKey="settings.llmProviders.claudeCodeInfo"
+                      components={{
+                        strong: <strong />,
+                        code: <code className="bg-amber-100 px-1 rounded" />
+                      }}
+                    />
                   </p>
                 </div>
               )}
@@ -1092,21 +1129,21 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Testing Connection...
+                    {t("settings.llmProviders.testing")}
                   </>
                 ) : testSuccess ? (
                   <>
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Connection Successful
+                    {t("settings.llmProviders.connectionSuccess")}
                   </>
                 ) : (
                   <>
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    Test Connection
+                    {t("settings.llmProviders.testConnection")}
                   </>
                 )}
               </button>
@@ -1115,7 +1152,7 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
               {testSuccess && availableModels.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-green-700 mb-2">
-                    ✓ Found {availableModels.length} model{availableModels.length !== 1 ? 's' : ''}
+                    {t("settings.llmProviders.foundModels", { count: availableModels.length })}
                   </label>
                   <div className="max-h-40 overflow-y-auto p-3 bg-green-50 border border-green-200 rounded-lg space-y-1">
                     {availableModels.map((model) => (
@@ -1131,13 +1168,13 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
               {testSuccess && (
                 <div>
                   <label className="block text-sm font-medium text-ink-700 mb-2">
-                    Provider Name
+                    {t("settings.llmProviders.providerName")}
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g., My OpenAI"
+                    placeholder={t("settings.llmProviders.providerNamePlaceholder")}
                     className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20"
                   />
                 </div>
@@ -1163,14 +1200,14 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
                     }}
                     className="flex-1 px-4 py-2.5 text-sm font-medium text-ink-600 bg-ink-50 rounded-lg hover:bg-ink-100 transition-colors"
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </button>
                   <button
                     type="submit"
                     disabled={!name.trim()}
                     className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-accent rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Add
+                    {t("common.add")}
                   </button>
                 </div>
               )}
@@ -1190,7 +1227,7 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
                   }}
                   className="w-full px-4 py-2.5 text-sm font-medium text-ink-600 bg-ink-50 rounded-lg hover:bg-ink-100 transition-colors"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               )}
             </form>
@@ -1221,34 +1258,35 @@ function WebToolsTab({
   showZaiPassword,
   setShowZaiPassword
 }: any) {
+  const { t } = useTranslation();
   return (
     <div className="px-6 py-4 space-y-6">
       <div>
         <label className="block text-sm font-medium text-ink-700 mb-2">
-          Web Search Provider
-          <span className="ml-2 text-xs font-normal text-ink-500">Select search engine for web search</span>
+          {t("settings.webTools.providerLabel")}
+          <span className="ml-2 text-xs font-normal text-ink-500">{t("settings.webTools.providerHint")}</span>
         </label>
         <select
           value={webSearchProvider}
           onChange={(e) => setWebSearchProvider(e.target.value as WebSearchProvider)}
           className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
         >
-          <option value="tavily">Tavily</option>
-          <option value="zai">Z.AI</option>
+          <option value="tavily">{t("settings.webTools.providerTavily")}</option>
+          <option value="zai">{t("settings.webTools.providerZai")}</option>
         </select>
       </div>
 
       {webSearchProvider === 'tavily' && (
         <div>
           <label className="block text-sm font-medium text-ink-700 mb-2">
-            Tavily API Key
+            {t("settings.webTools.tavilyApiKey")}
           </label>
           <div className="relative">
             <input
               type={showTavilyPassword ? "text" : "password"}
               value={tavilyApiKey}
               onChange={(e) => setTavilyApiKey(e.target.value)}
-              placeholder="tvly-... (optional)"
+              placeholder={t("settings.webTools.tavilyPlaceholder")}
               className="w-full px-4 py-2.5 pr-10 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
             />
             <button
@@ -1269,13 +1307,18 @@ function WebToolsTab({
             </button>
           </div>
           <p className="mt-1 text-xs text-ink-500">
-            Получите API ключ на <a href="https://tavily.com" target="_blank" rel="noopener noreferrer" className="text-ink-700 hover:underline">tavily.com</a>
+            <Trans
+              i18nKey="settings.webTools.tavilyApiKeyHint"
+              components={{
+                link: <a href="https://tavily.com" target="_blank" rel="noopener noreferrer" className="text-ink-700 hover:underline" />
+              }}
+            />
           </p>
           
           <div className="mt-4 flex items-center justify-between">
             <div>
-              <span className={`text-sm font-medium ${tavilyApiKey ? 'text-ink-700' : 'text-ink-400'}`}>Enable Web Search</span>
-              <p className="text-xs text-ink-500">Use Tavily for search_web and extract_page tools</p>
+              <span className={`text-sm font-medium ${tavilyApiKey ? 'text-ink-700' : 'text-ink-400'}`}>{t("settings.webTools.enableWebSearch")}</span>
+              <p className="text-xs text-ink-500">{t("settings.webTools.tavilyDescription")}</p>
             </div>
             <button
               type="button"
@@ -1298,14 +1341,14 @@ function WebToolsTab({
       {webSearchProvider === 'zai' && (
         <div>
           <label className="block text-sm font-medium text-ink-700 mb-2">
-            Z.AI API Key
+            {t("settings.webTools.zaiApiKey")}
           </label>
           <div className="relative">
             <input
               type={showZaiPassword ? "text" : "password"}
               value={zaiApiKey}
               onChange={(e) => setZaiApiKey(e.target.value)}
-              placeholder="zai-... (optional)"
+              placeholder={t("settings.webTools.zaiPlaceholder")}
               className="w-full px-4 py-2.5 pr-10 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
             />
             <button
@@ -1326,7 +1369,12 @@ function WebToolsTab({
             </button>
           </div>
           <p className="mt-1 text-xs text-ink-500">
-            Получите API ключ на <a href="https://chat.z.ai/manage-apikey/apikey-list" target="_blank" rel="noopener noreferrer" className="text-ink-700 hover:underline">chat.z.ai</a>
+            <Trans
+              i18nKey="settings.webTools.zaiApiKeyHint"
+              components={{
+                link: <a href="https://chat.z.ai/manage-apikey/apikey-list" target="_blank" rel="noopener noreferrer" className="text-ink-700 hover:underline" />
+              }}
+            />
           </p>
         </div>
       )}
@@ -1334,29 +1382,29 @@ function WebToolsTab({
       {webSearchProvider === 'zai' && (
         <div>
           <label className="block text-sm font-medium text-ink-700 mb-2">
-            Z.AI API URL
-            <span className="ml-2 text-xs font-normal text-ink-500">Выберите вариант endpoint</span>
+            {t("settings.webTools.zaiApiUrl")}
+            <span className="ml-2 text-xs font-normal text-ink-500">{t("settings.webTools.endpointHint")}</span>
           </label>
           <select
             value={zaiApiUrl}
             onChange={(e) => setZaiApiUrl(e.target.value as ZaiApiUrl)}
             className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
           >
-            <option value="default">Default (https://api.z.ai/api/paas/v4/web_search)</option>
-            <option value="coding">Coding (https://api.z.ai/api/coding/paas/v4/web_search)</option>
+            <option value="default">{t("settings.webTools.zaiSearchDefault")}</option>
+            <option value="coding">{t("settings.webTools.zaiSearchCoding")}</option>
           </select>
         </div>
       )}
 
       <div className="border-t border-ink-900/10 pt-4">
         <label className="block text-sm font-medium text-ink-700 mb-2">
-          Web Page Reader
+          {t("settings.webTools.readerLabel")}
         </label>
         <label className="flex items-center justify-between cursor-pointer">
           <div className="flex-1">
-            <span className="block text-sm font-medium text-ink-700">Enable Z.AI Reader</span>
+            <span className="block text-sm font-medium text-ink-700">{t("settings.webTools.enableReader")}</span>
             <p className="mt-1 text-xs text-ink-500">
-              Use Z.AI API to read and parse web page content
+              {t("settings.webTools.readerDescription")}
             </p>
           </div>
           <div className="relative">
@@ -1374,24 +1422,47 @@ function WebToolsTab({
       {enableZaiReader && (
         <div>
           <label className="block text-sm font-medium text-ink-700 mb-2">
-            Z.AI Reader API URL
-            <span className="ml-2 text-xs font-normal text-ink-500">Выберите вариант endpoint</span>
+            {t("settings.webTools.readerApiUrl")}
+            <span className="ml-2 text-xs font-normal text-ink-500">{t("settings.webTools.endpointHint")}</span>
           </label>
           <select
             value={zaiReaderApiUrl}
             onChange={(e) => setZaiReaderApiUrl(e.target.value as ZaiReaderApiUrl)}
             className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
           >
-            <option value="default">Default (https://api.z.ai/api/paas/v4/reader)</option>
-            <option value="coding">Coding (https://api.z.ai/api/coding/paas/v4/reader)</option>
+            <option value="default">{t("settings.webTools.zaiReaderDefault")}</option>
+            <option value="coding">{t("settings.webTools.zaiReaderCoding")}</option>
           </select>
           {!zaiApiKey && (
             <p className="mt-1 text-xs text-amber-600">
-              Warning: Z.AI API Key is required for reader to work. Add it in Web Search section.
+              {t("settings.webTools.readerKeyWarning")}
             </p>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function LanguageTab({ language, onLanguageChange }: { language: ApiSettings["language"]; onLanguageChange: (language: ApiSettings["language"]) => void; }) {
+  const { t } = useTranslation();
+  return (
+    <div className="px-6 py-4 space-y-6">
+      <div>
+        <label className="block text-sm font-medium text-ink-700 mb-2">
+          {t("settings.language.label")}
+          <span className="ml-2 text-xs font-normal text-ink-500">{t("settings.language.hint")}</span>
+        </label>
+        <select
+          value={language || "auto"}
+          onChange={(e) => onLanguageChange?.(e.target.value as ApiSettings["language"])}
+          className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
+        >
+          <option value="auto">{t("settings.language.auto")}</option>
+          <option value="en">{t("settings.language.english")}</option>
+          <option value="zh-CN">{t("settings.language.chinese")}</option>
+        </select>
+      </div>
     </div>
   );
 }
@@ -1416,6 +1487,7 @@ function ToolsTab({
   sessionGitError,
   onToggleSessionGitRepo
 }: any) {
+  const { t } = useTranslation();
   const [defaultDir, setDefaultDir] = useState<string>("");
 
   // Load default conversations directory on mount
@@ -1433,14 +1505,15 @@ function ToolsTab({
 
   return (
     <div className="px-6 py-4 space-y-6">
+
       <div>
         <label className="block text-sm font-medium text-ink-700 mb-3">
-          Conversation Data Directory
-          <span className="ml-2 text-xs font-normal text-ink-500">Used when starting a new session without a workspace</span>
+          {t("settings.conversationDir.label")}
+          <span className="ml-2 text-xs font-normal text-ink-500">{t("settings.conversationDir.hint")}</span>
         </label>
         {defaultDir && (
           <div className="mb-2 text-xs text-ink-500">
-            Leave empty to use default: <code className="bg-ink-100 px-1.5 py-0.5 rounded">{defaultDir}</code>
+            {t("settings.conversationDir.defaultHint", { dir: defaultDir })}
           </div>
         )}
 
@@ -1448,7 +1521,7 @@ function ToolsTab({
           <input
             value={conversationDataDir || ''}
             onChange={(e) => setConversationDataDir(e.target.value)}
-            placeholder={defaultDir || "/path/to/conversations"}
+            placeholder={defaultDir || t("settings.conversationDir.placeholder")}
             className="flex-1 px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
           />
           <button
@@ -1463,26 +1536,26 @@ function ToolsTab({
             }}
             className="px-4 py-2.5 text-sm font-medium text-ink-700 bg-ink-50 rounded-lg hover:bg-ink-100 transition-colors"
           >
-            Browse…
+            {t("common.browse")}
           </button>
         </div>
         <p className="mt-2 text-xs text-ink-500">
-          If set, ValeDesk will create <span className="font-mono">{`{dir}/{sessionId}`}</span> and use it for file I/O.
+          <span className="font-mono">{t("settings.conversationDir.usage")}</span>
         </p>
       </div>
 
       <div className="border-t border-ink-900/10 pt-4">
         <label className="block text-sm font-medium text-ink-700 mb-3">
-          Session Git Repo
-          <span className="ml-2 text-xs font-normal text-ink-500">Initialize a git repo in each session folder</span>
+          {t("settings.sessionGit.label")}
+          <span className="ml-2 text-xs font-normal text-ink-500">{t("settings.sessionGit.hint")}</span>
         </label>
         <label className="flex items-center justify-between cursor-pointer">
           <div className="flex-1">
-            <span className="block text-sm font-medium text-ink-700">Enable per-session Git</span>
+            <span className="block text-sm font-medium text-ink-700">{t("settings.sessionGit.toggleLabel")}</span>
             <p className="mt-0.5 text-xs text-ink-500">
               {sessionGitChecking
-                ? "Checking for Git..."
-                : "Requires system Git. The app will initialize a repo if none exists."}
+                ? t("settings.sessionGit.checking")
+                : t("settings.sessionGit.requirement")}
             </p>
           </div>
           <div className="relative">
@@ -1505,16 +1578,16 @@ function ToolsTab({
 
       <div>
         <label className="block text-sm font-medium text-ink-700 mb-3">
-          Tool Groups
-          <span className="ml-2 text-xs font-normal text-ink-500">Enable/disable tool categories</span>
+          {t("settings.toolGroups.label")}
+          <span className="ml-2 text-xs font-normal text-ink-500">{t("settings.toolGroups.hint")}</span>
         </label>
         
         {/* Git Tools */}
         <label className="flex items-center justify-between cursor-pointer mb-4">
           <div className="flex-1">
-            <span className="block text-sm font-medium text-ink-700">Git Tools</span>
+            <span className="block text-sm font-medium text-ink-700">{t("settings.toolGroups.gitTools")}</span>
             <p className="mt-0.5 text-xs text-ink-500">
-              11 tools: status, log, diff, branch, checkout, add, commit, push, pull, reset, show
+              {t("settings.toolGroups.gitToolsHint")}
             </p>
           </div>
           <div className="relative">
@@ -1531,9 +1604,9 @@ function ToolsTab({
         {/* Browser Tools */}
         <label className="flex items-center justify-between cursor-pointer mb-4">
           <div className="flex-1">
-            <span className="block text-sm font-medium text-ink-700">Browser Automation</span>
+            <span className="block text-sm font-medium text-ink-700">{t("settings.toolGroups.browserTools")}</span>
             <p className="mt-0.5 text-xs text-ink-500">
-              11 tools: navigate, click, type, select, hover, scroll, press_key, wait_for, snapshot, screenshot, execute_script
+              {t("settings.toolGroups.browserToolsHint")}
             </p>
           </div>
           <div className="relative">
@@ -1550,9 +1623,9 @@ function ToolsTab({
         {/* DuckDuckGo Search */}
         <label className="flex items-center justify-between cursor-pointer mb-4">
           <div className="flex-1">
-            <span className="block text-sm font-medium text-ink-700">DuckDuckGo Search</span>
+            <span className="block text-sm font-medium text-ink-700">{t("settings.toolGroups.duckduckgo")}</span>
             <p className="mt-0.5 text-xs text-ink-500">
-              3 tools: search, search_news, search_images — no API key needed
+              {t("settings.toolGroups.duckduckgoHint")}
             </p>
           </div>
           <div className="relative">
@@ -1569,9 +1642,9 @@ function ToolsTab({
         {/* Fetch Tools */}
         <label className="flex items-center justify-between cursor-pointer">
           <div className="flex-1">
-            <span className="block text-sm font-medium text-ink-700">HTTP/Fetch Tools</span>
+            <span className="block text-sm font-medium text-ink-700">{t("settings.toolGroups.fetchTools")}</span>
             <p className="mt-0.5 text-xs text-ink-500">
-              3 tools: fetch, fetch_json, download — HTTP requests and file downloads
+              {t("settings.toolGroups.fetchToolsHint")}
             </p>
           </div>
           <div className="relative">
@@ -1588,9 +1661,9 @@ function ToolsTab({
         {/* Image Tools */}
         <label className="flex items-center justify-between cursor-pointer mt-4">
           <div className="flex-1">
-            <span className="block text-sm font-medium text-ink-700">Image Attachments</span>
+            <span className="block text-sm font-medium text-ink-700">{t("settings.toolGroups.imageTools")}</span>
             <p className="mt-0.5 text-xs text-ink-500">
-              1 tool: attach_image — convert local images to WebP for model input
+              {t("settings.toolGroups.imageToolsHint")}
             </p>
           </div>
           <div className="relative">
@@ -1607,16 +1680,16 @@ function ToolsTab({
         {/* Diff Source */}
         <div className="border-t border-ink-900/10 pt-4 mt-4">
           <label className="block text-sm font-medium text-ink-700 mb-3">
-            Diff Source
-            <span className="ml-2 text-xs font-normal text-ink-500">Choose how to get old file version for diff</span>
+            {t("settings.diffSource.label")}
+            <span className="ml-2 text-xs font-normal text-ink-500">{t("settings.diffSource.hint")}</span>
           </label>
           <label className="flex items-center justify-between cursor-pointer">
             <div className="flex-1">
-              <span className="block text-sm font-medium text-ink-700">Use Git for Diff</span>
+              <span className="block text-sm font-medium text-ink-700">{t("settings.diffSource.useGitLabel")}</span>
               <p className="mt-0.5 text-xs text-ink-500">
                 {useGitForDiff 
-                  ? "Using git HEAD version for old file content (requires git repo)"
-                  : "Using file snapshots for old file content (works without git)"}
+                  ? t("settings.diffSource.gitHint")
+                  : t("settings.diffSource.snapshotHint")}
               </p>
             </div>
             <div className="relative">
@@ -1646,14 +1719,15 @@ function MemoryModeTab({
   permissionMode,
   setPermissionMode
 }: any) {
+  const { t } = useTranslation();
   return (
     <div className="px-6 py-4 space-y-6">
       <div>
         <label className="flex items-center justify-between cursor-pointer">
           <div className="flex-1">
-            <span className="block text-sm font-medium text-ink-700">Enable Memory</span>
+            <span className="block text-sm font-medium text-ink-700">{t("settings.memory.enable")}</span>
             <p className="mt-1 text-xs text-ink-500">
-              Allow agent to store and recall information in memory.md (stored in ~/.valera/)
+              {t("settings.memory.description")}
             </p>
           </div>
           <div className="relative">
@@ -1675,29 +1749,29 @@ function MemoryModeTab({
           <div className="mt-4">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium text-ink-700">
-                Memory Content
+                {t("settings.memory.contentLabel")}
               </label>
               <button
                 onClick={loadMemoryContent}
                 disabled={memoryLoading}
                 className="text-xs text-accent hover:underline disabled:opacity-50"
               >
-                {memoryLoading ? "Loading..." : "Reload"}
+                {memoryLoading ? t("settings.memory.loading") : t("settings.memory.reload")}
               </button>
             </div>
             {memoryError && (
               <p className="mb-2 text-xs text-error">
-                Failed to read/save memory: {memoryError}
+                {t("settings.memory.error", { error: memoryError })}
               </p>
             )}
             <textarea
               value={memoryContent}
               onChange={(e) => setMemoryContent(e.target.value)}
-              placeholder="Memory is empty. Agent will automatically add information here during conversations..."
+              placeholder={t("settings.memory.placeholder")}
               className="w-full h-32 px-3 py-2 text-xs border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all resize-none font-mono"
             />
             <p className="mt-1 text-xs text-ink-500">
-              File: <code className="bg-ink-50 px-1 py-0.5 rounded">~/.valera/memory.md</code>
+              {t("settings.memory.fileLabel")} <code className="bg-ink-50 px-1 py-0.5 rounded">~/.valera/memory.md</code>
             </p>
           </div>
         )}
@@ -1705,18 +1779,18 @@ function MemoryModeTab({
 
       <div className="border-t border-ink-900/10 pt-6">
         <label className="block text-sm font-medium text-ink-700 mb-2">
-          Permission Mode
+          {t("settings.permissionMode.label")}
         </label>
         <select
           value={permissionMode}
           onChange={(e) => setPermissionMode(e.target.value as 'default' | 'ask')}
           className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-ink-900/20 transition-all"
         >
-          <option value="default">Auto-execute (default)</option>
-          <option value="ask">Ask before each tool</option>
+          <option value="default">{t("settings.permissionMode.auto")}</option>
+          <option value="ask">{t("settings.permissionMode.ask")}</option>
         </select>
         <p className="mt-1 text-xs text-ink-500">
-          Choose whether tools execute automatically or require confirmation
+          {t("settings.permissionMode.hint")}
         </p>
       </div>
     </div>

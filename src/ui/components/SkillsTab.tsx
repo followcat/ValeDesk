@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import type { Skill } from "../types";
 
 interface SkillsTabProps {
@@ -22,6 +23,7 @@ export function SkillsTab({
   onRefresh,
   onSetMarketplaceUrl
 }: SkillsTabProps) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [showOnlyEnabled, setShowOnlyEnabled] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function SkillsTab({
   const enabledCount = skills.filter(s => s.enabled).length;
 
   const formatLastFetched = () => {
-    if (!lastFetched) return "Never";
+    if (!lastFetched) return t("skills.lastUpdatedNever");
     const date = new Date(lastFetched);
     return date.toLocaleString();
   };
@@ -54,9 +56,9 @@ export function SkillsTab({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-medium text-ink-900">Skills Marketplace</h3>
+          <h3 className="text-lg font-medium text-ink-900">{t("skills.title")}</h3>
           <p className="text-sm text-ink-500">
-            {skills.length} skills available • {enabledCount} enabled
+            {t("skills.summary", { total: skills.length, enabled: enabledCount })}
           </p>
         </div>
         <button
@@ -74,7 +76,7 @@ export function SkillsTab({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           )}
-          Refresh
+          {t("skills.refresh")}
         </button>
       </div>
 
@@ -82,14 +84,14 @@ export function SkillsTab({
       <div className="p-3 bg-ink-50 rounded-lg">
         <div className="flex items-center justify-between">
           <div className="text-sm">
-            <span className="text-ink-500">Marketplace:</span>{" "}
+            <span className="text-ink-500">{t("skills.marketplaceLabel")}</span>{" "}
             {editingUrl ? (
               <input
                 type="text"
                 value={newUrl}
                 onChange={(e) => setNewUrl(e.target.value)}
                 className="ml-2 px-2 py-1 text-sm border border-ink-200 rounded"
-                placeholder="GitHub API URL"
+                placeholder={t("skills.marketplacePlaceholder")}
               />
             ) : (
               <span className="text-ink-700 font-mono text-xs">{marketplaceUrl}</span>
@@ -105,7 +107,7 @@ export function SkillsTab({
                   }}
                   className="px-2 py-1 text-xs font-medium text-white bg-accent rounded hover:bg-accent/90"
                 >
-                  Save
+                  {t("common.save")}
                 </button>
                 <button
                   onClick={() => {
@@ -114,7 +116,7 @@ export function SkillsTab({
                   }}
                   className="px-2 py-1 text-xs font-medium text-ink-600 bg-ink-100 rounded hover:bg-ink-200"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               </>
             ) : (
@@ -122,13 +124,13 @@ export function SkillsTab({
                 onClick={() => setEditingUrl(true)}
                 className="px-2 py-1 text-xs font-medium text-ink-600 bg-ink-100 rounded hover:bg-ink-200"
               >
-                Edit
+                {t("common.edit")}
               </button>
             )}
           </div>
         </div>
         <div className="mt-1 text-xs text-ink-400">
-          Last updated: {formatLastFetched()}
+          {t("skills.lastUpdated", { time: formatLastFetched() })}
         </div>
       </div>
 
@@ -146,7 +148,7 @@ export function SkillsTab({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search skills..."
+            placeholder={t("skills.searchPlaceholder")}
             className="w-full pl-9 pr-4 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/20"
           />
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -159,7 +161,7 @@ export function SkillsTab({
           onChange={(e) => setSelectedCategory(e.target.value || null)}
           className="px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/20"
         >
-          <option value="">All categories</option>
+          <option value="">{t("skills.allCategories")}</option>
           {categories.map(cat => (
             <option key={cat} value={cat}>{cat}</option>
           ))}
@@ -173,7 +175,7 @@ export function SkillsTab({
               : 'bg-ink-100 text-ink-600 hover:bg-ink-200'
           }`}
         >
-          Enabled only
+          {t("skills.enabledOnly")}
         </button>
       </div>
 
@@ -183,11 +185,11 @@ export function SkillsTab({
           <div className="py-8 text-center text-ink-500">
             {skills.length === 0 ? (
               <>
-                <p className="text-lg font-medium">No skills loaded</p>
-                <p className="text-sm mt-1">Click "Refresh" to load skills from the marketplace</p>
+                <p className="text-lg font-medium">{t("skills.noneLoaded")}</p>
+                <p className="text-sm mt-1">{t("skills.noneLoadedHint")}</p>
               </>
             ) : (
-              <p>No skills match your search</p>
+              <p>{t("skills.noneMatch")}</p>
             )}
           </div>
         ) : (
@@ -204,9 +206,13 @@ export function SkillsTab({
       {/* Info */}
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-800">
-          <strong>How skills work:</strong> Enabled skills are mentioned in the system prompt.
-          When the agent encounters a matching task, it can use the <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">load_skill</code> tool
-          to get detailed instructions and scripts.
+          <Trans
+            i18nKey="skills.info"
+            components={{
+              strong: <strong />,
+              code: <code className="px-1 py-0.5 bg-blue-100 rounded text-xs" />
+            }}
+          />
         </p>
       </div>
     </div>
@@ -214,6 +220,7 @@ export function SkillsTab({
 }
 
 function SkillCard({ skill, onToggle }: { skill: Skill; onToggle: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className={`p-4 border rounded-lg transition-colors ${
       skill.enabled 
@@ -232,8 +239,8 @@ function SkillCard({ skill, onToggle }: { skill: Skill; onToggle: () => void }) 
           </div>
           <p className="mt-1 text-sm text-ink-600 line-clamp-2">{skill.description}</p>
           <div className="mt-2 flex items-center gap-3 text-xs text-ink-400">
-            {skill.author && <span>by {skill.author}</span>}
-            {skill.version && <span>v{skill.version}</span>}
+            {skill.author && <span>{t("skills.byAuthor", { author: skill.author })}</span>}
+            {skill.version && <span>{t("skills.version", { version: skill.version })}</span>}
             {skill.license && <span>{skill.license}</span>}
           </div>
         </div>

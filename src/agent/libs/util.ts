@@ -12,6 +12,8 @@ const require = (process as any).pkg
   ? eval('require')
   : (typeof globalThis.require === "function" ? globalThis.require : createRequire(import.meta.url));
 
+export const DEFAULT_SESSION_TITLE = "New Chat";
+
 function getElectronApp(): any | null {
   const electronVersion = (process.versions as any)?.electron;
   if (!electronVersion) return null;
@@ -84,7 +86,7 @@ export const claudeCodePath = getClaudeCodePath();
 export const enhancedEnv = getEnhancedEnv();
 
 export const generateSessionTitle = async (userIntent: string | null, sessionModel?: string) => {
-  if (!userIntent) return "New Chat";
+  if (!userIntent) return DEFAULT_SESSION_TITLE;
 
   try {
     let apiKey: string | undefined;
@@ -210,7 +212,7 @@ function extractFallbackTitle(text: string): string {
     : cleaned.split(/\s+/).slice(0, 2).join(' ');
 
   if (!titleRaw) {
-    return "New Chat";
+    return DEFAULT_SESSION_TITLE;
   }
 
   // Capitalize first letter of each word (noop for non-Latin scripts)

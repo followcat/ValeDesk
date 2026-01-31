@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export interface FileConflict {
   filePath: string;
@@ -18,6 +19,7 @@ export interface ConflictResolutionProps {
 }
 
 export function ConflictResolution({ conflicts, onResolveConflict, onRejectAll }: ConflictResolutionProps) {
+  const { t } = useTranslation();
   const [expandedConflicts, setExpandedConflicts] = useState<Set<string>>(new Set());
 
   if (!conflicts || conflicts.length === 0) {
@@ -44,18 +46,18 @@ export function ConflictResolution({ conflicts, onResolveConflict, onRejectAll }
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <h4 className="text-sm font-medium text-error">
-              File Conflicts ({conflicts.length})
+              {t("conflictResolution.title", { count: conflicts.length })}
             </h4>
           </div>
           <button
             onClick={onRejectAll}
             className="text-xs font-medium text-error hover:text-error/80 px-3 py-1.5 rounded-md border border-error/30 hover:bg-error/10 transition-colors"
           >
-            Reject All Changes
+            {t("conflictResolution.rejectAll")}
           </button>
         </div>
         <p className="text-xs text-error/70 mt-1">
-          These files were modified by multiple threads. Choose which version to apply.
+          {t("conflictResolution.subtitle")}
         </p>
       </div>
 
@@ -78,7 +80,7 @@ export function ConflictResolution({ conflicts, onResolveConflict, onRejectAll }
                       {conflict.filePath}
                     </div>
                     <div className="text-xs text-error/70">
-                      Modified by {conflict.threads.length} thread{conflict.threads.length > 1 ? 's' : ''}
+                      {t("conflictResolution.modifiedBy", { count: conflict.threads.length })}
                     </div>
                   </div>
                 </div>
@@ -120,8 +122,8 @@ export function ConflictResolution({ conflicts, onResolveConflict, onRejectAll }
                             <span className="text-xs text-muted">({thread.threadId})</span>
                           </div>
                           <div className="flex gap-3 text-xs">
-                            <span className="text-success font-medium">+{thread.linesAdded} lines</span>
-                            <span className="text-error font-medium">-{thread.linesRemoved} lines</span>
+                            <span className="text-success font-medium">{t("conflictResolution.linesAdded", { count: thread.linesAdded })}</span>
+                            <span className="text-error font-medium">{t("conflictResolution.linesRemoved", { count: thread.linesRemoved })}</span>
                           </div>
                           <div className="mt-2 p-2 rounded bg-surface-tertiary max-h-32 overflow-y-auto">
                             <pre className="text-xs text-ink-600 whitespace-pre-wrap font-mono">

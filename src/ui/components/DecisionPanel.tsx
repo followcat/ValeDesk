@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import type { PermissionRequest } from "../store/useAppStore";
 
@@ -19,6 +20,7 @@ export function DecisionPanel({
   request: PermissionRequest;
   onSubmit: (result: PermissionResult) => void;
 }) {
+  const { t } = useTranslation();
   const input = request.input as AskUserQuestionInput | null;
   const questions = input?.questions ?? [];
   const [selectedOptions, setSelectedOptions] = useState<Record<number, string[]>>({});
@@ -69,10 +71,10 @@ export function DecisionPanel({
   if (request.toolName === "AskUserQuestion" && questions.length > 0) {
     return (
       <div className="rounded-2xl border border-accent/20 bg-accent-subtle p-5">
-        <div className="text-xs font-semibold text-accent">Question from Claude</div>
+        <div className="text-xs font-semibold text-accent">{t("decisionPanel.questionTitle")}</div>
         {request.explanation && (
           <div className="mt-2 rounded-lg bg-info/10 px-3 py-2 border border-info/20">
-            <div className="text-xs font-medium text-info mb-1">Why this tool is being called:</div>
+            <div className="text-xs font-medium text-info mb-1">{t("decisionPanel.whyCalled")}</div>
             <div className="text-sm text-ink-700">{request.explanation}</div>
           </div>
         )}
@@ -113,16 +115,16 @@ export function DecisionPanel({
               })}
             </div>
             <div className="mt-3">
-              <label className="block text-xs font-medium text-muted">Other</label>
+              <label className="block text-xs font-medium text-muted">{t("decisionPanel.other")}</label>
               <input
                 type="text"
                 className="mt-1 w-full rounded-xl border border-ink-900/10 bg-surface px-3 py-2 text-sm text-ink-700 focus:border-info/50 focus:outline-none"
-                placeholder="Type your answer..."
+                placeholder={t("decisionPanel.otherPlaceholder")}
                 value={otherInputs[qIndex] ?? ""}
                 onChange={(e) => setOtherInputs((prev) => ({ ...prev, [qIndex]: e.target.value }))}
               />
             </div>
-            {q.multiSelect && <div className="mt-2 text-xs text-muted">Multiple selections allowed.</div>}
+            {q.multiSelect && <div className="mt-2 text-xs text-muted">{t("decisionPanel.multiSelectHint")}</div>}
           </div>
         ))}
         <div className="mt-5 flex flex-wrap gap-3">
@@ -136,13 +138,13 @@ export function DecisionPanel({
             }}
             disabled={!canSubmit}
           >
-            Submit answers
+            {t("decisionPanel.submitAnswers")}
           </button>
           <button
             className="rounded-full border border-ink-900/10 bg-surface px-5 py-2 text-sm font-medium text-ink-700 hover:bg-surface-tertiary transition-colors"
-            onClick={() => onSubmit({ behavior: "deny", message: "User canceled the question" })}
+            onClick={() => onSubmit({ behavior: "deny", message: t("decisionPanel.cancelMessage") })}
           >
-            Cancel
+            {t("common.cancel")}
           </button>
         </div>
       </div>
@@ -151,20 +153,20 @@ export function DecisionPanel({
 
   return (
     <div className="rounded-2xl border border-accent/20 bg-accent-subtle p-5">
-      <div className="text-xs font-semibold text-accent">Tool Permission Request</div>
+      <div className="text-xs font-semibold text-accent">{t("decisionPanel.permissionTitle")}</div>
       <p className="mt-2 text-sm text-ink-700">
-        Agent wants to use tool: <span className="font-medium">{request.toolName}</span>
+        {t("decisionPanel.permissionPrompt")} <span className="font-medium">{request.toolName}</span>
       </p>
       
       {request.explanation && (
         <div className="mt-3 rounded-lg bg-info/10 px-3 py-2 border border-info/20">
-          <div className="text-xs font-medium text-info mb-1">🤖 Explanation:</div>
+          <div className="text-xs font-medium text-info mb-1">{t("decisionPanel.explanation")}</div>
           <div className="text-sm text-ink-700">{request.explanation}</div>
         </div>
       )}
       
       <div className="mt-3 rounded-xl bg-surface-tertiary p-3">
-        <div className="text-xs font-medium text-muted mb-2">Tool Arguments:</div>
+        <div className="text-xs font-medium text-muted mb-2">{t("decisionPanel.toolArguments")}</div>
         <pre className="text-xs text-ink-600 font-mono whitespace-pre-wrap break-words max-h-40 overflow-auto">
           {JSON.stringify(request.input, null, 2)}
         </pre>
@@ -174,13 +176,13 @@ export function DecisionPanel({
           className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-white shadow-soft hover:bg-accent-hover transition-colors"
           onClick={() => onSubmit({ behavior: "allow", updatedInput: request.input as Record<string, unknown> })}
         >
-          Allow
+          {t("common.allow")}
         </button>
         <button
           className="rounded-full border border-ink-900/10 bg-surface px-5 py-2 text-sm font-medium text-ink-700 hover:bg-surface-tertiary transition-colors"
-          onClick={() => onSubmit({ behavior: "deny", message: "User denied the request" })}
+          onClick={() => onSubmit({ behavior: "deny", message: t("decisionPanel.denyMessage") })}
         >
-          Deny
+          {t("common.deny")}
         </button>
       </div>
     </div>

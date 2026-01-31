@@ -20,7 +20,7 @@ import { loadSkillsSettings, toggleSkill, setMarketplaceUrl } from "../agent/lib
 import { fetchSkillsFromMarketplace } from "../agent/libs/skills-loader.js";
 import { webCache } from "../agent/libs/web-cache.js";
 import * as gitUtils from "../agent/git-utils.js";
-import { generateSessionTitle } from "../agent/libs/util.js";
+import { generateSessionTitle, DEFAULT_SESSION_TITLE } from "../agent/libs/util.js";
 
 type RunnerHandle = {
   abort: () => void;
@@ -608,10 +608,10 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
     payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd, model: session.model, temperature: session.temperature },
   } as any);
 
-  if (session.title === "New Chat" && event.payload.prompt) {
+  if (session.title === DEFAULT_SESSION_TITLE && event.payload.prompt) {
     generateSessionTitle(event.payload.prompt, session.model)
       .then((newTitle) => {
-        if (newTitle && newTitle !== "New Chat") {
+        if (newTitle && newTitle !== DEFAULT_SESSION_TITLE) {
           sessions.updateSession(session.id, { title: newTitle });
           emit({
             type: "session.status",
@@ -669,10 +669,10 @@ function handleSessionContinue(event: Extract<ClientEvent, { type: "session.cont
     payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd, model: session.model, temperature: session.temperature },
   } as any);
 
-  if (session.title === "New Chat" && prompt) {
+  if (session.title === DEFAULT_SESSION_TITLE && prompt) {
     generateSessionTitle(prompt, session.model)
       .then((newTitle) => {
-        if (newTitle && newTitle !== "New Chat") {
+        if (newTitle && newTitle !== DEFAULT_SESSION_TITLE) {
           sessions.updateSession(session.id, { title: newTitle });
           emit({
             type: "session.status",

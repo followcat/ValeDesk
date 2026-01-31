@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { MultiThreadTask, SessionInfo } from "../types";
 
 interface MultiThreadTaskItemProps {
@@ -18,6 +19,7 @@ export function MultiThreadTaskItem({
   sendEvent,
   isActive = false
 }: MultiThreadTaskItemProps) {
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   
   const threads = task.threadIds.map(id => sessions[id]).filter(Boolean);
@@ -61,7 +63,7 @@ export function MultiThreadTaskItem({
             {/* Status indicator */}
             <span className="flex-shrink-0">
               {isCreated && (
-                <span className="w-3.5 h-3.5 rounded-full bg-warning" title="Ready to start" />
+                <span className="w-3.5 h-3.5 rounded-full bg-warning" title={t("multiThread.readyToStart")} />
               )}
               {isRunning && (
                 <span className="w-3.5 h-3.5 rounded-full bg-info animate-pulse" />
@@ -91,18 +93,18 @@ export function MultiThreadTaskItem({
               <div className="flex items-center justify-between mt-0.5 text-xs text-muted">
                 <span>
                   {isCreated
-                    ? `${totalCount} threads ready`
-                    : `${completedCount}/${totalCount} threads done`
+                    ? t("sidebar.threadsReady", { count: totalCount })
+                    : t("sidebar.threadsDone", { completed: completedCount, total: totalCount })
                   }
                 </span>
                 <div className="flex items-center gap-2">
                   {/* Mode badge */}
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent/20 text-accent">
-                    {task.mode === 'consensus' ? 'Consensus' : 'Multi'}
+                    {task.mode === 'consensus' ? t("sidebar.consensus") : t("sidebar.multi")}
                   </span>
                   {totalTokens > 0 && (
                     <span className="text-[10px] text-muted bg-ink-100 px-1.5 py-0.5 rounded-full">
-                      {totalTokens.toLocaleString()} tokens
+                      {t("sidebar.tokensLabel", { count: totalTokens.toLocaleString() })}
                     </span>
                   )}
                 </div>
@@ -114,22 +116,22 @@ export function MultiThreadTaskItem({
             {/* Status text */}
             {isCreated && (
               <span className="text-warning text-xs font-medium px-2 py-1 bg-warning/10 rounded">
-                Ready
+                {t("multiThread.ready")}
               </span>
             )}
             {isRunning && (
               <span className="text-info text-xs font-medium">
-                {runningCount} running...
+                {t("sidebar.runningCount", { count: runningCount })}
               </span>
             )}
             {isCompleted && (
               <span className="text-success text-xs font-medium">
-                ✓ Complete
+                {t("multiThread.complete")}
               </span>
             )}
             {errorCount > 0 && (
               <span className="text-error text-xs font-medium">
-                {errorCount} errors
+                {t("sidebar.errors", { count: errorCount })}
               </span>
             )}
           </div>
@@ -165,19 +167,19 @@ export function MultiThreadTaskItem({
                 }}
                 className="text-xs font-medium px-2 py-1 bg-warning text-white rounded hover:bg-warning/80 transition-colors"
               >
-                ▶ Start All Threads
+                {t("multiThread.startAllThreads")}
               </button>
             )}
             
             {/* Additional info badges */}
             {task.shareWebCache && (
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-ink-100 text-ink-600">
-                Shared Cache
+                {t("sidebar.sharedCache")}
               </span>
             )}
             {task.autoSummary && (
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-purple-100 text-purple-600">
-                Auto-Summary
+                {t("sidebar.autoSummary")}
               </span>
             )}
             
@@ -187,9 +189,9 @@ export function MultiThreadTaskItem({
                 onDeleteTask(task.id);
               }}
               className="text-xs text-muted hover:text-error transition-colors ml-auto"
-              title="Remove task"
+              title={t("multiThread.removeTask")}
             >
-              Delete
+              {t("common.delete")}
             </button>
           </div>
 
@@ -199,7 +201,7 @@ export function MultiThreadTaskItem({
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              Threads working together
+              {t("multiThread.threadsWorking")}
             </div>
             {threads.map((thread) => {
               const isSummaryThread = thread.id === task.summaryThreadId;
@@ -228,10 +230,10 @@ export function MultiThreadTaskItem({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className={`text-xs truncate ${isSummaryThread ? 'text-purple-700 font-medium' : 'text-ink-600'}`}>
-                        {isSummaryThread ? '📋 Summary' : thread.model || 'Unknown'}
+                        {isSummaryThread ? t("sidebar.summary") : thread.model || t("common.unknown")}
                       </span>
                       <span className="text-[10px] text-muted">
-                        {((thread.inputTokens || 0) + (thread.outputTokens || 0)).toLocaleString()} tokens
+                        {t("sidebar.tokensLabel", { count: ((thread.inputTokens || 0) + (thread.outputTokens || 0)).toLocaleString() })}
                       </span>
                     </div>
                   </div>
