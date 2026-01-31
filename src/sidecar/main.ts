@@ -1141,40 +1141,50 @@ function handleTaskStop(event: Extract<ClientEvent, { type: "task.stop" }>) {
 function handleFileChangesConfirm(event: Extract<ClientEvent, { type: "file_changes.confirm" }>) {
   const { sessionId } = event.payload;
   const session = sessions.getSession(sessionId);
-  if (!session) {
-    emit({ type: "file_changes.error", payload: { sessionId, message: "Session not found" } } as any);
-    return;
+  
+  // If session exists in memory, confirm the changes
+  if (session) {
+    sessions.confirmFileChanges(sessionId);
   }
-
-  sessions.confirmFileChanges(sessionId);
+  // Note: If session not in memory, the changes were already applied to disk.
+  // The UI just needs to update its state, so we still emit the confirmed event.
+  
   emit({ type: "file_changes.confirmed", payload: { sessionId } } as any);
 }
 
 function handleFileChangesRollback(event: Extract<ClientEvent, { type: "file_changes.rollback" }>) {
-  const { sessionId } = event.payload;
+  const { sessionId, cwd: providedCwd, fileChanges: providedChanges } = event.payload as any;
   const session = sessions.getSession(sessionId);
-
-  if (!session || !session.cwd) {
-    emit({ type: "file_changes.error", payload: { sessionId, message: "Session not found or no working directory" } } as any);
+  
+  // Use provided cwd or get from session
+  const cwd = providedCwd || session?.cwd;
+  
+  if (!cwd) {
+    emit({ type: "file_changes.error", payload: { sessionId, message: "No working directory available for rollback" } } as any);
     return;
   }
 
-  if (!gitUtils.isGitRepo(session.cwd)) {
+  if (!gitUtils.isGitRepo(cwd)) {
     emit({ type: "file_changes.error", payload: { sessionId, message: "Not a git repository" } } as any);
     return;
   }
 
-  const allChanges = sessions.getFileChanges(sessionId);
+  // Use provided file changes or get from memory
+  const allChanges = providedChanges || (session ? sessions.getFileChanges(sessionId) : []);
   const pendingChanges = allChanges.filter((c: any) => c.status === "pending");
+  
   if (pendingChanges.length === 0) {
     emit({ type: "file_changes.error", payload: { sessionId, message: "No pending changes to rollback" } } as any);
     return;
   }
 
   const filePaths = pendingChanges.map((c: any) => c.path);
-  const { failed } = gitUtils.checkoutFiles(filePaths, session.cwd);
+  const { failed } = gitUtils.checkoutFiles(filePaths, cwd);
 
-  sessions.clearFileChanges(sessionId);
+  if (session) {
+    sessions.clearFileChanges(sessionId);
+  }
+  
   const remainingChanges = allChanges.filter((c: any) => failed.includes(c.path));
   emit({ type: "file_changes.rolledback", payload: { sessionId, fileChanges: remainingChanges } } as any);
 }

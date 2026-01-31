@@ -326,7 +326,7 @@ export type ClientEvent =
   | { type: "open.external"; payload: { url: string; } }
   | { type: "models.get" }
   | { type: "file_changes.confirm"; payload: { sessionId: string; } }
-  | { type: "file_changes.rollback"; payload: { sessionId: string; } }
+  | { type: "file_changes.rollback"; payload: { sessionId: string; cwd?: string; fileChanges?: FileChange[] } }
   | { type: "thread.list"; payload: { sessionId: string } }
   | { type: "task.create"; payload: CreateTaskPayload }
   | { type: "task.start"; payload: { taskId: string } }

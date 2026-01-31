@@ -380,8 +380,17 @@ function App() {
   }, [sendEvent]);
 
   const handleRollbackChanges = useCallback((sessionId: string) => {
-    sendEvent({ type: "file_changes.rollback", payload: { sessionId } });
-  }, [sendEvent]);
+    // Include cwd and fileChanges for cases where session is not in sidecar memory
+    const session = sessions[sessionId];
+    sendEvent({ 
+      type: "file_changes.rollback", 
+      payload: { 
+        sessionId,
+        cwd: session?.cwd,
+        fileChanges: session?.fileChanges
+      } 
+    });
+  }, [sendEvent, sessions]);
 
   const handleCreateTask = useCallback((payload: any) => {
     // Create task - it will auto-start on backend
