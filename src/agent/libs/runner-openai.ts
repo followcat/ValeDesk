@@ -25,6 +25,13 @@ import {
   requestPreviewApproval,
   type PreviewBatchResult
 } from "./preview-manager.js";
+import { validateSession, formatValidationResult } from "./session-validation.js";
+import { 
+  checkActionCompliance, 
+  createActionIntent, 
+  formatComplianceResult,
+  type ComplianceResult 
+} from "./compliance-gate.js";
 
 // Helper function to save attachment to disk
 function saveAttachmentToDisk(attachment: Attachment, cwd: string): string | null {
@@ -167,6 +174,36 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
   // They will be restored from DB if this is an existing session
   clearTodos(session.id);
 
+  // Session startup validation (Charter + ADR integrity)
+  const sessionStore = (global as any).sessionStore;
+  const sessionData = sessionStore?.getSession(session.id);
+  if (sessionData) {
+    const validationResult = validateSession({
+      charter: sessionData.charter,
+      charterHash: sessionData.charterHash,
+      adrs: sessionData.adrs
+    });
+    
+    if (!validationResult.valid) {
+      // Log validation errors but don't block execution
+      console.warn('[runner] Session validation failed:', validationResult.errors);
+      onEvent({
+        type: "stream.message" as any,
+        payload: {
+          sessionId: session.id,
+          message: {
+            type: 'system',
+            subtype: 'warning',
+            text: formatValidationResult(validationResult)
+          } as any
+        }
+      });
+    } else if (validationResult.warnings.length > 0) {
+      // Log warnings
+      console.log('[runner] Session validation warnings:', validationResult.warnings);
+    }
+  }
+
   // Permission tracking
   const pendingPermissions = new Map<string, { resolve: (approved: boolean) => void }>();
 
@@ -179,9 +216,9 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
 
   // Save to DB without triggering UI updates
   const saveToDb = (type: string, content: any) => {
-    const sessionStore = (global as any).sessionStore;
-    if (sessionStore && session.id) {
-      sessionStore.recordMessage(session.id, { type, ...content });
+    const sessionStoreLocal = (global as any).sessionStore;
+    if (sessionStoreLocal && session.id) {
+      sessionStoreLocal.recordMessage(session.id, { type, ...content });
     }
   };
 
@@ -1239,6 +1276,54 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
             }
           }
           // In default mode, execute immediately without asking
+
+          // Compliance gate: check action against charter constraints
+          const currentSessionData = sessionStore?.getSession(session.id);
+          if (currentSessionData?.charter) {
+            const actionIntent = createActionIntent(toolName, toolArgs);
+            const complianceResult: ComplianceResult = checkActionCompliance(actionIntent, {
+              charter: currentSessionData.charter,
+              adrs: currentSessionData.adrs
+            });
+            
+            if (!complianceResult.allowed) {
+              // Hard fail: block execution
+              console.log(`[Compliance] Action blocked:`, complianceResult.reason);
+              
+              executionLogger.logToolExecution({
+                toolName,
+                toolUseId,
+                input: toolArgs,
+                status: 'error',
+                error: `Compliance check failed: ${complianceResult.reason}`,
+                durationMs: Date.now() - toolStartTime
+              });
+              
+              // Notify user
+              sendMessage('system', { 
+                subtype: 'warning', 
+                text: formatComplianceResult(complianceResult) 
+              });
+              
+              toolResults.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                name: toolName,
+                content: `Error: ${formatComplianceResult(complianceResult)}`
+              });
+              
+              continue; // Skip this tool
+            }
+            
+            if (complianceResult.status === 'soft_fail') {
+              // Soft fail: warn but continue
+              console.log(`[Compliance] Soft warning:`, complianceResult.warnings);
+              sendMessage('system', { 
+                subtype: 'info', 
+                text: `⚠️ Compliance note: ${complianceResult.reason}` 
+              });
+            }
+          }
 
           // Preview system: check if file modification tools need preview approval
           const previewTools = ['write_file', 'edit_file'];
