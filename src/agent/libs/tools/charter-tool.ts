@@ -3,9 +3,36 @@
  */
 
 import type { ToolDefinition, ToolResult, ToolExecutionContext } from './base-tool.js';
-import type { CharterData, CharterItem } from '../../types.js';
+import type { CharterData, CharterItem, ADRItem } from '../../types.js';
 import { computeCharterHash } from '../../types.js';
 import { randomUUID } from 'crypto';
+
+// Generate ADR ID in format: adr-YYYY-MM-DD-<short_id>
+function generateADRId(): string {
+  const date = new Date().toISOString().slice(0, 10);
+  const shortId = randomUUID().slice(0, 8);
+  return `adr-${date}-${shortId}`;
+}
+
+// Create ADR for charter change
+function createCharterChangeADR(
+  oldHash: string | undefined,
+  newHash: string,
+  changedFields: string[]
+): ADRItem {
+  return {
+    id: generateADRId(),
+    title: `Charter Update: ${changedFields.join(', ')}`,
+    status: 'accepted',  // Charter changes are auto-accepted
+    type: 'charter-change',
+    date: Date.now(),
+    context: `Charter was updated. Changed fields: ${changedFields.join(', ')}`,
+    decision: 'Update charter to reflect new requirements/constraints',
+    consequences: ['Session scope has been modified', 'Previous charter hash is now outdated'],
+    charterHashBefore: oldHash,
+    charterHashAfter: newHash
+  };
+}
 
 export const CharterToolDefinition: ToolDefinition = {
   type: "function",
@@ -275,6 +302,7 @@ export async function executeCharterTool(
         return { success: false, error: 'No charter exists. Use action="set" first.' };
       }
       
+      const oldCharterHash = session.charterHash;
       const now = Date.now();
       const updated: CharterData = {
         ...session.charter,
@@ -282,39 +310,60 @@ export async function executeCharterTool(
         version: (session.charter.version || 0) + 1
       };
       
+      // Track which fields changed
+      const changedFields: string[] = [];
+      
       if (args.goal) {
         updated.goal = createCharterItem(args.goal, 'goal');
+        changedFields.push('goal');
       }
       if (args.non_goals) {
         updated.nonGoals = args.non_goals.map(ng => createCharterItem(ng, 'ng'));
+        changedFields.push('non_goals');
       }
       if (args.definition_of_done) {
         updated.definitionOfDone = args.definition_of_done.map(d => createCharterItem(d, 'dod'));
+        changedFields.push('definition_of_done');
       }
       if (args.constraints) {
         updated.constraints = args.constraints.map(c => createCharterItem(c, 'con'));
+        changedFields.push('constraints');
       }
       if (args.invariants) {
         updated.invariants = args.invariants.map(inv => createCharterItem(inv, 'inv'));
+        changedFields.push('invariants');
       }
       if (args.glossary) {
         updated.glossary = { ...(updated.glossary || {}), ...args.glossary };
+        changedFields.push('glossary');
       }
       
       const charterHash = computeCharterHash(updated);
       
-      // Update session
-      sessionStore.updateSession(context.sessionId, { charter: updated, charterHash });
+      // Auto-create ADR for charter change
+      const adrs: ADRItem[] = session.adrs || [];
+      const charterADR = createCharterChangeADR(oldCharterHash, charterHash, changedFields);
+      adrs.push(charterADR);
       
-      // Emit update event
+      // Update session with both charter and ADR
+      sessionStore.updateSession(context.sessionId, { 
+        charter: updated, 
+        charterHash,
+        adrs
+      });
+      
+      // Emit update events
       if (context.onCharterChanged) {
         context.onCharterChanged(updated, charterHash);
+      }
+      if (context.onADRsChanged) {
+        context.onADRsChanged(adrs);
       }
       
       return {
         success: true,
-        output: `Charter updated (v${updated.version}).\n\nHash: ${charterHash}\n\n${renderCharterMarkdown(updated)}`,
-        data: { charter: updated, charterHash }
+        output: `Charter updated (v${updated.version}).\n\nHash: ${charterHash}\n\nADR created: ${charterADR.id}\n\n${renderCharterMarkdown(updated)}`,
+        data: { charter: updated, charterHash, adr: charterADR }
       };
     }
     
