@@ -133,6 +133,12 @@ impl Database {
             [],
         ); // Ignore error if column already exists
 
+        // Migration: add ADR system column if not exists
+        let _ = conn.execute(
+            "ALTER TABLE sessions ADD COLUMN adrs TEXT",
+            [],
+        ); // Ignore error if column already exists
+
         Ok(())
     }
 
@@ -179,6 +185,7 @@ impl Database {
             updated_at: now,
             charter: None,
             charter_hash: None,
+            adrs: None,
         })
     }
 
@@ -187,13 +194,15 @@ impl Database {
         let mut stmt = conn.prepare(
             r#"SELECT id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, 
                       model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, created_at, updated_at,
-                      charter, charter_hash
+                      charter, charter_hash, adrs
                FROM sessions ORDER BY updated_at DESC"#
         )?;
 
         let rows = stmt.query_map([], |row| {
             let charter_str: Option<String> = row.get(16)?;
             let charter = charter_str.and_then(|s| serde_json::from_str(&s).ok());
+            let adrs_str: Option<String> = row.get(18)?;
+            let adrs = adrs_str.and_then(|s| serde_json::from_str(&s).ok());
             
             Ok(Session {
                 id: row.get(0)?,
@@ -214,6 +223,7 @@ impl Database {
                 updated_at: row.get(15)?,
                 charter,
                 charter_hash: row.get(17)?,
+                adrs,
             })
         })?;
 
@@ -225,13 +235,15 @@ impl Database {
         let mut stmt = conn.prepare(
             r#"SELECT id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, 
                       model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, created_at, updated_at,
-                      charter, charter_hash
+                      charter, charter_hash, adrs
                FROM sessions WHERE id = ?1"#
         )?;
 
         let mut rows = stmt.query_map([id], |row| {
             let charter_str: Option<String> = row.get(16)?;
             let charter = charter_str.and_then(|s| serde_json::from_str(&s).ok());
+            let adrs_str: Option<String> = row.get(18)?;
+            let adrs = adrs_str.and_then(|s| serde_json::from_str(&s).ok());
             
             Ok(Session {
                 id: row.get(0)?,
@@ -252,6 +264,7 @@ impl Database {
                 updated_at: row.get(15)?,
                 charter,
                 charter_hash: row.get(17)?,
+                adrs,
             })
         })?;
 
@@ -317,6 +330,11 @@ impl Database {
         if let Some(ref charter_hash) = params.charter_hash {
             updates.push(format!("charter_hash = ?{}", idx));
             values.push(Box::new(charter_hash.clone()));
+            idx += 1;
+        }
+        if let Some(ref adrs) = params.adrs {
+            updates.push(format!("adrs = ?{}", idx));
+            values.push(Box::new(serde_json::to_string(adrs).unwrap_or_default()));
             idx += 1;
         }
 
@@ -567,6 +585,9 @@ pub struct Session {
     pub charter: Option<serde_json::Value>,  // JSON blob for CharterData
     #[serde(skip_serializing_if = "Option::is_none")]
     pub charter_hash: Option<String>,
+    // ADR system fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adrs: Option<serde_json::Value>,  // JSON blob for ADRItem[]
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -615,6 +636,9 @@ pub struct UpdateSessionParams {
     pub charter: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub charter_hash: Option<String>,
+    // ADR system fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adrs: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

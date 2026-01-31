@@ -5,7 +5,7 @@
  */
 
 import crypto from "crypto";
-import type { SessionStatus, StreamMessage, FileChange, CharterData } from "../agent/types.js";
+import type { SessionStatus, StreamMessage, FileChange, CharterData, ADRItem } from "../agent/types.js";
 
 export type PendingPermission = {
   toolUseId: string;
@@ -34,6 +34,8 @@ export type Session = {
   // Charter system fields
   charter?: CharterData;
   charterHash?: string;
+  // ADR system fields
+  adrs?: ADRItem[];
 };
 
 export type StoredSession = {
@@ -56,6 +58,8 @@ export type StoredSession = {
   // Charter system fields
   charter?: CharterData;
   charterHash?: string;
+  // ADR system fields
+  adrs?: ADRItem[];
 };
 
 export type TodoItem = {

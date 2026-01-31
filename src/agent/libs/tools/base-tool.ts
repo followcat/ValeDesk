@@ -2,7 +2,7 @@
  * Base interfaces for all tools
  */
 
-import type { CharterData } from '../../types.js';
+import type { CharterData, ADRItem } from '../../types.js';
 
 export interface ToolDefinition {
   type: "function";
@@ -30,6 +30,7 @@ export interface ToolExecutionContext {
   sessionId?: string;
   onTodosChanged?: (todos: any[]) => void;
   onCharterChanged?: (charter: CharterData, hash: string) => void;
+  onADRsChanged?: (adrs: ADRItem[]) => void;
 }
 
 export abstract class BaseTool {
