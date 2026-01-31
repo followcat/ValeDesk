@@ -260,6 +260,9 @@ export class MemorySessionStore {
     if (updates.model !== undefined) syncUpdates.model = updates.model;
     if (updates.inputTokens !== undefined) syncUpdates.inputTokens = session.inputTokens;
     if (updates.outputTokens !== undefined) syncUpdates.outputTokens = session.outputTokens;
+    if (updates.charter !== undefined) syncUpdates.charter = updates.charter;
+    if (updates.charterHash !== undefined) syncUpdates.charterHash = updates.charterHash;
+    if (updates.adrs !== undefined) syncUpdates.adrs = updates.adrs;
     
     if (Object.keys(syncUpdates).length > 0) {
       this.syncCallback?.('update', id, syncUpdates);

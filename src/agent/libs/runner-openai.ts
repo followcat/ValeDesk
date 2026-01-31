@@ -1431,6 +1431,46 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
                 type: 'todos.updated',
                 payload: { sessionId: session.id, todos }
               });
+            },
+            onCharterChanged: (charter, charterHash) => {
+              // Emit session status update with new charter
+              const updatedSession = sessionStore?.getSession(session.id);
+              if (updatedSession) {
+                onEvent({
+                  type: 'session.status',
+                  payload: {
+                    sessionId: session.id,
+                    status: updatedSession.status,
+                    title: updatedSession.title,
+                    cwd: updatedSession.cwd,
+                    model: updatedSession.model,
+                    temperature: updatedSession.temperature,
+                    charter,
+                    charterHash,
+                    adrs: updatedSession.adrs
+                  }
+                });
+              }
+            },
+            onADRsChanged: (adrs) => {
+              // Emit session status update with new ADRs
+              const updatedSession = sessionStore?.getSession(session.id);
+              if (updatedSession) {
+                onEvent({
+                  type: 'session.status',
+                  payload: {
+                    sessionId: session.id,
+                    status: updatedSession.status,
+                    title: updatedSession.title,
+                    cwd: updatedSession.cwd,
+                    model: updatedSession.model,
+                    temperature: updatedSession.temperature,
+                    charter: updatedSession.charter,
+                    charterHash: updatedSession.charterHash,
+                    adrs
+                  }
+                });
+              }
             }
           });
 

@@ -1,6 +1,11 @@
 /**
  * ADRPanel - Displays Architecture Decision Records for a session
  * Shows list of ADRs with status, allows status changes
+ * 
+ * Usage Tips:
+ * - ADRs are automatically created when Charter is updated
+ * - To create an ADR manually, say: "请记录一个技术决策：使用 PostgreSQL 作为数据库"
+ * - To update ADR status, say: "请接受 ADR adr-xxx 的决策"
  */
 
 import { useState } from "react";
@@ -31,20 +36,39 @@ const typeConfig: Record<ADRType, { icon: string; label: string }> = {
 export function ADRPanel({ adrs, onStatusChange }: ADRPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedADR, setSelectedADR] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   if (!adrs || adrs.length === 0) {
     return (
       <div className="rounded-lg border border-ink-200 bg-surface-secondary p-3">
-        <div className="flex items-center gap-2 text-ink-400">
-          <span className="text-lg">📑</span>
-          <span className="text-sm">No decisions recorded for this session</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-ink-400">
+            <span className="text-lg">📑</span>
+            <span className="text-sm">No decisions recorded yet</span>
+          </div>
+          <button 
+            onClick={() => setShowHelp(!showHelp)}
+            className="text-xs text-ink-400 hover:text-ink-600"
+          >
+            How to use?
+          </button>
         </div>
+        {showHelp && (
+          <div className="mt-2 p-2 bg-ink-50 rounded text-xs text-ink-600">
+            <p className="font-medium mb-1">💡 ADR (Architecture Decision Records) 使用方法:</p>
+            <ul className="list-disc list-inside space-y-0.5">
+              <li>更新 Charter 时会自动创建 ADR</li>
+              <li>手动创建: "请记录一个技术决策：使用 Redis 做缓存"</li>
+              <li>接受决策: "请接受 ADR adr-xxx"</li>
+            </ul>
+          </div>
+        )}
       </div>
     );
   }
 
   // Sort ADRs by date (newest first)
-  const sortedADRs = [...adrs].sort((a, b) => b.date - a.date);
+  const sortedADRs = [...adrs].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   // Count by status
   const statusCounts = adrs.reduce((acc, adr) => {
@@ -86,7 +110,7 @@ export function ADRPanel({ adrs, onStatusChange }: ADRPanelProps) {
             </div>
             <div className="flex items-center gap-3 mt-1 text-xs text-ink-400">
               <span className="font-mono">{adr.id}</span>
-              <span>{new Date(adr.date).toLocaleDateString()}</span>
+              <span>{new Date(adr.createdAt || 0).toLocaleDateString()}</span>
             </div>
           </div>
           <span className={`text-ink-400 transition-transform ${isSelected ? 'rotate-180' : ''}`}>
@@ -118,30 +142,26 @@ export function ADRPanel({ adrs, onStatusChange }: ADRPanelProps) {
             </div>
 
             {/* Consequences */}
-            {adr.consequences && adr.consequences.length > 0 && (
+            {adr.consequences && (
               <div className="mb-3">
                 <div className="text-xs font-medium text-ink-500 uppercase tracking-wide mb-1">
                   Consequences
                 </div>
-                <ul className="text-sm text-ink-600 list-disc list-inside">
-                  {adr.consequences.map((c, idx) => (
-                    <li key={idx}>{c}</li>
-                  ))}
-                </ul>
+                <div className="text-sm text-ink-600 whitespace-pre-wrap">
+                  {adr.consequences}
+                </div>
               </div>
             )}
 
             {/* Alternatives */}
-            {adr.alternatives && adr.alternatives.length > 0 && (
+            {adr.alternatives && (
               <div className="mb-3">
                 <div className="text-xs font-medium text-ink-500 uppercase tracking-wide mb-1">
                   Alternatives Considered
                 </div>
-                <ul className="text-sm text-ink-600 list-disc list-inside">
-                  {adr.alternatives.map((alt, idx) => (
-                    <li key={idx}>{alt}</li>
-                  ))}
-                </ul>
+                <div className="text-sm text-ink-600 whitespace-pre-wrap">
+                  {adr.alternatives}
+                </div>
               </div>
             )}
 

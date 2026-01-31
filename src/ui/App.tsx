@@ -544,18 +544,20 @@ function App() {
           </div>
         </div>
 
+        {/* Charter Panel - fixed above messages, doesn't scroll */}
+        {activeSession?.charter && (
+          <div className="flex-shrink-0 px-8 pt-2 pb-2 border-b border-ink-100 bg-surface">
+            <div className="mx-auto w-full max-w-4xl">
+              <CharterPanel
+                charter={activeSession.charter}
+                charterHash={activeSession.charterHash}
+              />
+            </div>
+          </div>
+        )}
+
         <div ref={messagesContainerRef} id="messages-container" className={`flex-1 overflow-y-auto overflow-x-hidden px-8 pt-6 min-w-0 ${activeSession?.todos && activeSession.todos.length > 0 ? 'pb-4' : 'pb-40'}`}>
           <div className="mx-auto w-full max-w-4xl min-w-0">
-            {/* Charter Panel - shows session scope/constraints at top */}
-            {activeSession?.charter && (
-              <div className="mb-4">
-                <CharterPanel
-                  charter={activeSession.charter}
-                  charterHash={activeSession.charterHash}
-                />
-              </div>
-            )}
-
             {/* ADR Panel - shows architecture decisions */}
             {activeSession?.adrs && activeSession.adrs.length > 0 && (
               <div className="mb-4">

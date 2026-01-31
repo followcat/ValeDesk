@@ -330,9 +330,9 @@ export type MultiThreadTask = {
 export type ServerEvent =
   | { type: "stream.message"; payload: { sessionId: string; threadId?: string; message: StreamMessage } }
   | { type: "stream.user_prompt"; payload: { sessionId: string; threadId?: string; prompt: string; attachments?: Attachment[] } }
-  | { type: "session.status"; payload: { sessionId: string; threadId?: string; status: SessionStatus; title?: string; cwd?: string; error?: string; model?: string; temperature?: number } }
+  | { type: "session.status"; payload: { sessionId: string; threadId?: string; status: SessionStatus; title?: string; cwd?: string; error?: string; model?: string; temperature?: number; charter?: CharterData; charterHash?: string; adrs?: ADRItem[] } }
   | { type: "session.list"; payload: { sessions: SessionInfo[] } }
-  | { type: "session.history"; payload: { sessionId: string; threadId?: string; status: SessionStatus; messages: StreamMessage[]; inputTokens?: number; outputTokens?: number; todos?: TodoItem[]; model?: string; fileChanges?: FileChange[]; hasMore?: boolean; nextCursor?: number; page?: "initial" | "prepend" } }
+  | { type: "session.history"; payload: { sessionId: string; threadId?: string; status: SessionStatus; messages: StreamMessage[]; inputTokens?: number; outputTokens?: number; todos?: TodoItem[]; model?: string; fileChanges?: FileChange[]; hasMore?: boolean; nextCursor?: number; page?: "initial" | "prepend"; charter?: CharterData; charterHash?: string; adrs?: ADRItem[] } }
   | { type: "session.deleted"; payload: { sessionId: string } }
   | { type: "thread.list"; payload: { sessionId: string; threads: ThreadInfo[] } }
   | { type: "task.created"; payload: { task: MultiThreadTask; threads: ThreadInfo[] } }
