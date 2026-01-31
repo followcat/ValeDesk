@@ -14,11 +14,17 @@ import { getInitialPrompt, getSystemPrompt } from "./prompt-loader.js";
 import { getTodosSummary, getTodos, setTodos, clearTodos } from "./tools/manage-todos-tool.js";
 import { ToolExecutor } from "./tools-executor.js";
 import type { FileChange } from "../types.js";
-import { writeFileSync, existsSync, mkdirSync } from "fs";
+import { writeFileSync, existsSync, mkdirSync, readFileSync } from "fs";
 import { isGitRepo, getRelativePath, getFileDiffStats } from "../git-utils.js";
-import { join } from "path";
+import { join, resolve } from "path";
 import { homedir } from "os";
 import { executionLogger } from "./execution-logger.js";
+import {
+  createChangePreview,
+  createPreviewBatch,
+  requestPreviewApproval,
+  type PreviewBatchResult
+} from "./preview-manager.js";
 
 // Helper function to save attachment to disk
 function saveAttachmentToDisk(attachment: Attachment, cwd: string): string | null {
@@ -59,6 +65,8 @@ export type RunnerOptions = {
 export type RunnerHandle = {
   abort: () => void;
   resolvePermission: (toolUseId: string, approved: boolean) => void;
+  resolvePreviewApproval: (approval: any) => void;
+  resolvePreviewBatchApproval: (batchApproval: any) => void;
 };
 
 const DEFAULT_CWD = process.cwd();
@@ -1232,6 +1240,90 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           }
           // In default mode, execute immediately without asking
 
+          // Preview system: check if file modification tools need preview approval
+          const previewTools = ['write_file', 'edit_file'];
+          if (previewTools.includes(toolName) && currentSettings?.enablePreview && currentSettings?.previewMode !== 'never') {
+            const filePath = toolArgs.file_path || toolArgs.path;
+            const cwd = session.cwd || '';
+            
+            let oldContent = '';
+            let newContent = toolArgs.content || '';
+            let previewType: 'file_edit' | 'file_create' = 'file_create';
+            
+            try {
+              if (toolName === 'edit_file' && cwd && filePath) {
+                const fullPath = resolve(cwd, filePath);
+                if (existsSync(fullPath)) {
+                  oldContent = readFileSync(fullPath, 'utf-8');
+                  // Apply the edit to get new content
+                  if (oldContent.includes(toolArgs.old_string)) {
+                    newContent = oldContent.replace(toolArgs.old_string, toolArgs.new_string);
+                    previewType = 'file_edit';
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn(`[Preview] Failed to read file for preview: ${e}`);
+            }
+            
+            // Create preview
+            const preview = createChangePreview(previewType, filePath, {
+              before: oldContent,
+              after: newContent,
+              description: toolArgs.explanation,
+            });
+            
+            const batch = createPreviewBatch(session.id, toolCall.id, toolName, [preview]);
+            
+            console.log(`[Preview] Requesting approval for ${toolName}:`, filePath);
+            
+            // Request approval and wait
+            const previewResult: PreviewBatchResult = await requestPreviewApproval(batch, onEvent);
+            
+            if (aborted) {
+              break;
+            }
+            
+            if (!previewResult.approved) {
+              console.log(`[Preview] ${toolName} rejected by user`);
+              
+              // Log preview rejection
+              executionLogger.logToolExecution({
+                toolName,
+                toolUseId,
+                input: toolArgs,
+                status: 'error',
+                error: 'Preview rejected by user',
+                durationMs: Date.now() - toolStartTime
+              });
+              
+              toolResults.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                name: toolName,
+                content: 'Error: File change rejected by user during preview'
+              });
+              
+              continue;
+            }
+            
+            // Check if user modified the content
+            const previewItem = previewResult.previews[0];
+            if (previewItem?.action === 'approve_modified' && previewItem.content) {
+              console.log(`[Preview] User modified content for ${toolName}`);
+              if (toolName === 'write_file') {
+                toolArgs.content = previewItem.content;
+              } else if (toolName === 'edit_file') {
+                // For edit_file, user modified the final result
+                // We need to recalculate old_string/new_string or use write mode
+                toolArgs.content = previewItem.content;
+                toolArgs._use_write_mode = true;
+              }
+            }
+            
+            console.log(`[Preview] ${toolName} approved, proceeding with execution`);
+          }
+
           // Execute tool with callback for todos persistence
           // CRITICAL: Force flush stdout to ensure logs are visible
           console.log(`[OpenAI Runner] ========== EXECUTING TOOL ==========`);
@@ -1691,6 +1783,15 @@ DO NOT call the same tool again with similar arguments.`
     },
     resolvePermission: (toolUseId: string, approved: boolean) => {
       resolvePermission(toolUseId, approved);
+    },
+    resolvePreviewApproval: (approval: any) => {
+      // Import at runtime to avoid circular dependency
+      const { handlePreviewApproval } = require("./preview-manager.js");
+      handlePreviewApproval(approval);
+    },
+    resolvePreviewBatchApproval: (batchApproval: any) => {
+      const { handleBatchApproval } = require("./preview-manager.js");
+      handleBatchApproval(batchApproval);
     }
   };
 }

@@ -53,6 +53,8 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
   const [conversationDataDir, setConversationDataDir] = useState(currentSettings?.conversationDataDir || "");
   const [useGitForDiff, setUseGitForDiff] = useState(currentSettings?.useGitForDiff ?? true);
   const [enableSessionGitRepo, setEnableSessionGitRepo] = useState(currentSettings?.enableSessionGitRepo ?? false);
+  const [enablePreview, setEnablePreview] = useState(currentSettings?.enablePreview ?? false);
+  const [previewMode, setPreviewMode] = useState<'always' | 'ask' | 'never'>(currentSettings?.previewMode ?? 'always');
   const [sessionGitChecking, setSessionGitChecking] = useState(false);
   const [sessionGitError, setSessionGitError] = useState<string | null>(null);
   const [memoryLoading, setMemoryLoading] = useState(false);
@@ -166,6 +168,8 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       setConversationDataDir(currentSettings.conversationDataDir || "");
       setUseGitForDiff(currentSettings.useGitForDiff ?? true);
       setEnableSessionGitRepo(currentSettings.enableSessionGitRepo ?? false);
+      setEnablePreview(currentSettings.enablePreview ?? false);
+      setPreviewMode(currentSettings.previewMode ?? 'always');
       setSessionGitChecking(false);
       setSessionGitError(null);
     }
@@ -332,7 +336,9 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
       useGitForDiff,
       llmProviders: llmProviderSettings,
       conversationDataDir: conversationDataDir.trim() || undefined,
-      enableSessionGitRepo
+      enableSessionGitRepo,
+      enablePreview,
+      previewMode
     };
     
     console.log('[SettingsModal] Full settings to save:', settingsToSave);
@@ -509,6 +515,10 @@ export function SettingsModal({ onClose, onSave, currentSettings }: SettingsModa
                 sessionGitChecking={sessionGitChecking}
                 sessionGitError={sessionGitError}
                 onToggleSessionGitRepo={handleSessionGitToggle}
+                enablePreview={enablePreview}
+                setEnablePreview={setEnablePreview}
+                previewMode={previewMode}
+                setPreviewMode={setPreviewMode}
               />
             ) : activeTab === 'skills' ? (
               <div className="p-6">
@@ -1414,7 +1424,11 @@ function ToolsTab({
   enableSessionGitRepo,
   sessionGitChecking,
   sessionGitError,
-  onToggleSessionGitRepo
+  onToggleSessionGitRepo,
+  enablePreview,
+  setEnablePreview,
+  previewMode,
+  setPreviewMode
 }: any) {
   const [defaultDir, setDefaultDir] = useState<string>("");
 
@@ -1629,6 +1643,48 @@ function ToolsTab({
               <div className="w-11 h-6 bg-ink-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
             </div>
           </label>
+        </div>
+
+        {/* Preview System */}
+        <div className="border-t border-ink-900/10 pt-4 mt-4">
+          <label className="block text-sm font-medium text-ink-700 mb-3">
+            Change Preview
+            <span className="ml-2 text-xs font-normal text-ink-500">Review file changes before they are applied</span>
+          </label>
+          <label className="flex items-center justify-between cursor-pointer mb-4">
+            <div className="flex-1">
+              <span className="block text-sm font-medium text-ink-700">Enable Preview Mode</span>
+              <p className="mt-0.5 text-xs text-ink-500">
+                {enablePreview 
+                  ? "File changes will be shown for approval before execution"
+                  : "File changes are applied immediately"}
+              </p>
+            </div>
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={enablePreview}
+                onChange={(e) => setEnablePreview(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-ink-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+            </div>
+          </label>
+          
+          {enablePreview && (
+            <div className="ml-4">
+              <label className="block text-sm font-medium text-ink-700 mb-2">Preview Mode</label>
+              <select
+                value={previewMode}
+                onChange={(e) => setPreviewMode(e.target.value as 'always' | 'ask' | 'never')}
+                className="w-full px-3 py-2 border border-ink-900/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+              >
+                <option value="always">Always preview file changes</option>
+                <option value="ask">Ask for each tool (not yet implemented)</option>
+                <option value="never">Never preview (use permission mode instead)</option>
+              </select>
+            </div>
+          )}
         </div>
       </div>
     </div>

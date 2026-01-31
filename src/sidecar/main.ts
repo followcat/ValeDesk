@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { mkdirSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import type { ClientEvent, Attachment, ApiSettings } from "../ui/types.js";
+import type { ClientEvent, Attachment, ApiSettings, PreviewApproval, BatchApproval } from "../ui/types.js";
 import type { FileChange } from "../agent/types.js";
 import type { ServerEvent } from "../agent/types.js";
 import type { SidecarInboundMessage, SidecarOutboundMessage } from "./protocol.js";
@@ -21,10 +21,13 @@ import { fetchSkillsFromMarketplace } from "../agent/libs/skills-loader.js";
 import { webCache } from "../agent/libs/web-cache.js";
 import * as gitUtils from "../agent/git-utils.js";
 import { generateSessionTitle } from "../agent/libs/util.js";
+import { handlePreviewApproval, handleBatchApproval } from "../agent/libs/preview-manager.js";
 
 type RunnerHandle = {
   abort: () => void;
   resolvePermission: (toolUseId: string, approved: boolean) => void;
+  resolvePreviewApproval?: (approval: any) => void;
+  resolvePreviewBatchApproval?: (batchApproval: any) => void;
 };
 
 function writeOut(msg: SidecarOutboundMessage) {
@@ -1284,6 +1287,22 @@ function handleSkillsSetMarketplace(event: Extract<ClientEvent, { type: "skills.
   setMarketplaceUrl(url);
 }
 
+// Preview system handlers
+function handlePreviewApproveEvent(event: Extract<ClientEvent, { type: "preview.approve" }>) {
+  const approval = event.payload as PreviewApproval;
+  handlePreviewApproval(approval);
+}
+
+function handlePreviewApproveAllEvent(event: Extract<ClientEvent, { type: "preview.approve_all" }>) {
+  const batchApproval = event.payload as BatchApproval;
+  handleBatchApproval(batchApproval);
+}
+
+function handlePreviewRejectAllEvent(event: Extract<ClientEvent, { type: "preview.reject_all" }>) {
+  const batchApproval = event.payload as BatchApproval;
+  handleBatchApproval(batchApproval);
+}
+
 async function handleClientEvent(event: ClientEvent) {
   switch (event.type) {
     case "session.list":
@@ -1375,6 +1394,16 @@ async function handleClientEvent(event: ClientEvent) {
       return;
     case "skills.set-marketplace":
       handleSkillsSetMarketplace(event);
+      return;
+    // Preview system events
+    case "preview.approve":
+      handlePreviewApproveEvent(event);
+      return;
+    case "preview.approve_all":
+      handlePreviewApproveAllEvent(event);
+      return;
+    case "preview.reject_all":
+      handlePreviewRejectAllEvent(event);
       return;
     default:
       // For now, emit a visible error so UI doesn't silently stall.
