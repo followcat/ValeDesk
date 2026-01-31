@@ -563,6 +563,36 @@ export class SessionStore {
     console.warn(`[SessionStore] Message with uuid ${uuid} not found in session ${sessionId}`);
   }
 
+  replaceMessagesBeforeIndexWithSummary(sessionId: string, endIndex: number, summary: string): void {
+    const rows = this.db
+      .prepare(`select id, data from messages where session_id = ? order by created_at asc`)
+      .all(sessionId) as Array<{ id: string; data: string }>;
+
+    if (endIndex < 0 || endIndex >= rows.length) {
+      console.warn(`Summary replace index ${endIndex} out of bounds for session ${sessionId}`);
+      return;
+    }
+
+    const targetRow = rows[endIndex];
+    const summaryMessage = {
+      type: "system_summary",
+      summary,
+      uuid: `summary_${Date.now()}`
+    };
+
+    this.db
+      .prepare(`update messages set data = ? where id = ?`)
+      .run(JSON.stringify(summaryMessage), targetRow.id);
+
+    const idsToDelete = rows.slice(0, endIndex).map((row) => row.id);
+    if (idsToDelete.length === 0) return;
+
+    const placeholders = idsToDelete.map(() => "?").join(",");
+    this.db
+      .prepare(`delete from messages where session_id = ? and id in (${placeholders})`)
+      .run(sessionId, ...idsToDelete);
+  }
+
   deleteSession(id: string): boolean {
     const existing = this.sessions.get(id);
     if (existing) {

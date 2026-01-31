@@ -999,6 +999,9 @@ export function MessageCard({
   onRollbackChanges?: (sessionId: string) => void;
 }) {
   const showIndicator = isLast && isRunning;
+  if ((message as any).type === "system_summary") {
+    return null;
+  }
 
   if (message.type === "user_prompt") {
     return <UserMessageCard 

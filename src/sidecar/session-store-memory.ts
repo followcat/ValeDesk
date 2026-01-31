@@ -340,8 +340,24 @@ export class MemorySessionStore {
         return;
       }
     }
-    
+
     console.warn(`[MemorySessionStore] Message with uuid ${uuid} not found in session ${sessionId}`);
+  }
+
+  replaceMessagesBeforeIndexWithSummary(sessionId: string, endIndex: number, summary: string): void {
+    const messages = this.messages.get(sessionId) || [];
+    if (endIndex < 0 || endIndex >= messages.length) {
+      console.warn(`[MemorySessionStore] Summary replace index ${endIndex} out of bounds for session ${sessionId}`);
+      return;
+    }
+
+    const summaryMessage: StreamMessage = {
+      type: "system_summary",
+      summary,
+    } as any;
+
+    messages[endIndex] = summaryMessage;
+    this.messages.set(sessionId, messages.slice(endIndex));
   }
 
   deleteSession(id: string): boolean {
