@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import type { ClientEvent, Attachment, ApiSettings, PreviewApproval, BatchApproval } from "../ui/types.js";
 import type { FileChange } from "../agent/types.js";
 import type { ServerEvent } from "../agent/types.js";
+import { computeCharterHash } from "../agent/types.js";
 import type { SidecarInboundMessage, SidecarOutboundMessage } from "./protocol.js";
 
 // Use in-memory session store - no SQLite/better-sqlite3 dependency
@@ -595,7 +596,6 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
 
   // Set charter if provided
   if (event.payload.charter) {
-    const { computeCharterHash } = require('../agent/types.js');
     const charterHash = computeCharterHash(event.payload.charter);
     sessions.updateSession(session.id, { 
       charter: event.payload.charter,
