@@ -13,6 +13,8 @@ import { PromptInput, usePromptActions } from "./components/PromptInput";
 import { MessageCard } from "./components/EventCard";
 import { AppFooter } from "./components/AppFooter";
 import { TodoPanel } from "./components/TodoPanel";
+import { CharterPanel } from "./components/CharterPanel";
+import { ADRPanel } from "./components/ADRPanel";
 import { PreviewPanel } from "./components/PreviewPanel";
 import MDContent from "./render/markdown";
 import { getPlatform } from "./platform";
@@ -606,6 +608,25 @@ function App() {
               activeSessionId={activeSessionId}
               onConfirmChanges={handleConfirmChanges}
               onRollbackChanges={handleRollbackChanges}
+            />
+          </div>
+        )}
+
+        {/* Charter Panel - shows session scope/constraints */}
+        {activeSession?.charter && (
+          <div className="flex-shrink-0 px-4 pb-2 mx-auto w-full max-w-4xl">
+            <CharterPanel
+              charter={activeSession.charter}
+              charterHash={activeSession.charterHash}
+            />
+          </div>
+        )}
+
+        {/* ADR Panel - shows architecture decisions */}
+        {activeSession?.adrs && activeSession.adrs.length > 0 && (
+          <div className="flex-shrink-0 px-4 pb-2 mx-auto w-full max-w-4xl">
+            <ADRPanel
+              adrs={activeSession.adrs}
             />
           </div>
         )}
