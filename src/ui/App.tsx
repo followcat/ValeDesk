@@ -546,6 +546,23 @@ function App() {
 
         <div ref={messagesContainerRef} id="messages-container" className={`flex-1 overflow-y-auto overflow-x-hidden px-8 pt-6 min-w-0 ${activeSession?.todos && activeSession.todos.length > 0 ? 'pb-4' : 'pb-40'}`}>
           <div className="mx-auto w-full max-w-4xl min-w-0">
+            {/* Charter Panel - shows session scope/constraints at top */}
+            {activeSession?.charter && (
+              <div className="mb-4">
+                <CharterPanel
+                  charter={activeSession.charter}
+                  charterHash={activeSession.charterHash}
+                />
+              </div>
+            )}
+
+            {/* ADR Panel - shows architecture decisions */}
+            {activeSession?.adrs && activeSession.adrs.length > 0 && (
+              <div className="mb-4">
+                <ADRPanel adrs={activeSession.adrs} />
+              </div>
+            )}
+
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="text-lg font-medium text-ink-700">No messages yet</div>
@@ -608,25 +625,6 @@ function App() {
               activeSessionId={activeSessionId}
               onConfirmChanges={handleConfirmChanges}
               onRollbackChanges={handleRollbackChanges}
-            />
-          </div>
-        )}
-
-        {/* Charter Panel - shows session scope/constraints */}
-        {activeSession?.charter && (
-          <div className="flex-shrink-0 px-4 pb-2 mx-auto w-full max-w-4xl">
-            <CharterPanel
-              charter={activeSession.charter}
-              charterHash={activeSession.charterHash}
-            />
-          </div>
-        )}
-
-        {/* ADR Panel - shows architecture decisions */}
-        {activeSession?.adrs && activeSession.adrs.length > 0 && (
-          <div className="flex-shrink-0 px-4 pb-2 mx-auto w-full max-w-4xl">
-            <ADRPanel
-              adrs={activeSession.adrs}
             />
           </div>
         )}
