@@ -69,3 +69,6 @@ sessions.db-shm
 
 # LocalDesk workspace data
 .localdesk/
+
+# AI thinking / research notes
+AIthink/
