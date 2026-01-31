@@ -41,6 +41,67 @@ export interface FileChange {
   commitHash?: string;       // Commit hash for showing commit-level diffs
 }
 
+// ============================================================
+// Preview System Types (Phase 4.4-4.7)
+// ============================================================
+
+// Preview change types
+export type PreviewType = 
+  | 'file_edit'      // Modifying existing file
+  | 'file_create'    // Creating new file
+  | 'file_delete'    // Deleting file
+  | 'command_exec';  // Executing shell command
+
+// Preview status
+export type PreviewStatus = 'pending' | 'approved' | 'rejected' | 'modified';
+
+// Single change preview
+export interface ChangePreview {
+  id: string;                    // Unique preview ID
+  type: PreviewType;             // Type of change
+  target: string;                // File path or command
+  before?: string;               // Original content (for edit/delete)
+  after?: string;                // New content (for edit/create)
+  command?: string;              // Shell command (for command_exec)
+  description?: string;          // Human-readable description
+  status: PreviewStatus;         // Current status
+  userModifiedContent?: string;  // User's modified version (if status='modified')
+  createdAt: number;             // Timestamp
+}
+
+// Batch preview request from agent
+export interface PreviewBatch {
+  id: string;                    // Batch ID
+  sessionId: string;             // Session this belongs to
+  toolCallId: string;            // Original tool call ID
+  toolName: string;              // Tool that triggered this
+  previews: ChangePreview[];     // List of changes to preview
+  status: 'pending' | 'resolved';
+  createdAt: number;
+}
+
+// User's response to a preview
+export type ApprovalAction = 
+  | 'approve'           // Accept as-is
+  | 'approve_modified'  // Accept with user modifications
+  | 'reject_retry'      // Reject and ask agent to retry
+  | 'reject_skip';      // Reject and skip this operation
+
+export interface PreviewApproval {
+  batchId: string;
+  previewId: string;
+  action: ApprovalAction;
+  modifiedContent?: string;      // Content if action='approve_modified'
+  rejectReason?: string;         // Reason if action='reject_*'
+}
+
+// Batch approval (approve/reject all)
+export interface BatchApproval {
+  batchId: string;
+  action: 'approve_all' | 'reject_all';
+  rejectReason?: string;
+}
+
 // Skill types
 export interface Skill {
   id: string;
@@ -165,6 +226,10 @@ export type ApiSettings = {
   // as their working directory for file I/O.
   conversationDataDir?: string;
   enableSessionGitRepo?: boolean; // Initialize a git repo in session folders when available
+
+  // Preview system settings
+  enablePreview?: boolean; // Enable preview mode for file changes (default: false)
+  previewMode?: 'always' | 'ask' | 'never'; // When to show preview: always, ask (per-tool), never
 };
 
 export type ModelInfo = {
@@ -238,7 +303,10 @@ export type ServerEvent =
   | { type: "scheduler.notification"; payload: { title: string; body: string } }
   | { type: "scheduler.task_execute"; payload: { taskId: string; title: string; prompt?: string } }
   | { type: "scheduler.default_model.loaded"; payload: { modelId: string | null } }
-  | { type: "scheduler.default_temperature.loaded"; payload: { temperature: number; sendTemperature: boolean } };
+  | { type: "scheduler.default_temperature.loaded"; payload: { temperature: number; sendTemperature: boolean } }
+  // Preview system events
+  | { type: "preview.request"; payload: { batch: PreviewBatch } }
+  | { type: "preview.resolved"; payload: { batchId: string; sessionId: string } };
 
 // Client -> Server events
 export type ClientEvent =
@@ -278,4 +346,8 @@ export type ClientEvent =
   | { type: "scheduler.default_model.get" }
   | { type: "scheduler.default_model.set"; payload: { modelId: string } }
   | { type: "scheduler.default_temperature.get" }
-  | { type: "scheduler.default_temperature.set"; payload: { temperature: number; sendTemperature: boolean } };
+  | { type: "scheduler.default_temperature.set"; payload: { temperature: number; sendTemperature: boolean } }
+  // Preview system events
+  | { type: "preview.approve"; payload: PreviewApproval }
+  | { type: "preview.approve_all"; payload: BatchApproval }
+  | { type: "preview.reject_all"; payload: BatchApproval };

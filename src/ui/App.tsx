@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import { useIPC } from "./hooks/useIPC";
 import { useAppStore } from "./store/useAppStore";
-import type { ServerEvent, ApiSettings } from "./types";
+import type { ServerEvent, ApiSettings, PreviewBatch, PreviewApproval } from "./types";
 import { Sidebar } from "./components/Sidebar";
 import { StartSessionModal } from "./components/StartSessionModal";
 import { SessionEditModal } from "./components/SessionEditModal";
@@ -13,6 +13,7 @@ import { PromptInput, usePromptActions } from "./components/PromptInput";
 import { MessageCard } from "./components/EventCard";
 import { AppFooter } from "./components/AppFooter";
 import { TodoPanel } from "./components/TodoPanel";
+import { PreviewPanel } from "./components/PreviewPanel";
 import MDContent from "./render/markdown";
 import { getPlatform } from "./platform";
 import { basenameFsPath } from "./platform/fs-path";
@@ -32,6 +33,11 @@ function App() {
   const [settingsLoaded, setSettingsLoaded] = useState(false); // Track if settings have been loaded from backend
   const [llmProvidersLoaded, setLlmProvidersLoaded] = useState(false); // Track if LLM providers have been loaded
   const partialUpdateScheduledRef = useRef(false);
+  
+  // Preview system state
+  const [previewBatch, setPreviewBatch] = useState<PreviewBatch | null>(null);
+  const [showPreviewPanel, setShowPreviewPanel] = useState(false);
+  
   const selectedModel = useAppStore((s) => s.selectedModel);
   const setSelectedModel = useAppStore((s) => s.setSelectedModel);
   const selectedTemperature = useAppStore((s) => s.selectedTemperature);
@@ -131,7 +137,21 @@ function App() {
     if (event.type === "scheduler.notification") {
       console.log(`[scheduler] 🔔 ${event.payload.title}: ${event.payload.body}`);
     }
-  }, [handleServerEvent, handlePartialMessages]);
+    
+    // Handle preview request event
+    if (event.type === "preview.request") {
+      setPreviewBatch(event.payload.batch);
+      setShowPreviewPanel(true);
+    }
+    
+    // Handle preview resolved event
+    if (event.type === "preview.resolved") {
+      if (previewBatch?.id === event.payload.batchId) {
+        setShowPreviewPanel(false);
+        setPreviewBatch(null);
+      }
+    }
+  }, [handleServerEvent, handlePartialMessages, previewBatch]);
 
   const { connected, sendEvent } = useIPC(onEvent);
   const { handleStartFromModal } = usePromptActions(sendEvent);
@@ -367,6 +387,23 @@ function App() {
     // Create task - it will auto-start on backend
     sendEvent({ type: "task.create", payload });
     setShowTaskDialog(false);
+  }, [sendEvent]);
+
+  // Preview system handlers
+  const handlePreviewApprove = useCallback((approval: PreviewApproval) => {
+    sendEvent({ type: "preview.approve", payload: approval });
+  }, [sendEvent]);
+
+  const handlePreviewApproveAll = useCallback((batchId: string) => {
+    sendEvent({ type: "preview.approve_all", payload: { batchId, action: "approve_all" } });
+    setShowPreviewPanel(false);
+    setPreviewBatch(null);
+  }, [sendEvent]);
+
+  const handlePreviewRejectAll = useCallback((batchId: string, reason?: string) => {
+    sendEvent({ type: "preview.reject_all", payload: { batchId, action: "reject_all", rejectReason: reason } });
+    setShowPreviewPanel(false);
+    setPreviewBatch(null);
   }, [sendEvent]);
 
   return (
@@ -643,6 +680,19 @@ function App() {
           onClose={() => setShowFileBrowser(false)} 
         />
       )}
+
+      {/* Preview Panel for change approval */}
+      <PreviewPanel
+        batch={previewBatch}
+        open={showPreviewPanel}
+        onClose={() => {
+          setShowPreviewPanel(false);
+          // Note: Don't clear batch here - let backend handle resolution
+        }}
+        onApprove={handlePreviewApprove}
+        onApproveAll={handlePreviewApproveAll}
+        onRejectAll={handlePreviewRejectAll}
+      />
 
       <AppFooter />
     </div>
