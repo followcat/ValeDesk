@@ -64,6 +64,24 @@ function selectRunner(model: string | undefined) {
   return runOpenAI;
 }
 
+// Helper to emit session.status with charter/adrs
+function emitSessionStatus(session: Session, statusOverride?: string) {
+  emit({
+    type: "session.status",
+    payload: {
+      sessionId: session.id,
+      status: statusOverride ?? session.status,
+      title: session.title,
+      cwd: session.cwd,
+      model: session.model,
+      temperature: session.temperature,
+      charter: session.charter,
+      charterHash: session.charterHash,
+      adrs: session.adrs
+    }
+  } as any);
+}
+
 const SESSION_GITIGNORE = `# Ignore everything by default
 *
 
@@ -582,7 +600,7 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
     }
   }
 
-  const session = sessions.createSession({
+  let session = sessions.createSession({
     id: forcedSessionId,
     cwd: resolvedCwd,
     title: event.payload.title,
@@ -601,6 +619,8 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
       charter: event.payload.charter,
       charterHash 
     });
+    // Re-fetch session to get updated charter
+    session = sessions.getSession(session.id)!;
   }
 
   ensureSessionGitRepo(session);
@@ -608,28 +628,24 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
   const hasAttachments = Array.isArray(event.payload.attachments) && event.payload.attachments.length > 0;
   if ((!event.payload.prompt || event.payload.prompt.trim() === "") && !hasAttachments) {
     sessions.updateSession(session.id, { status: "idle", lastPrompt: "" });
-    emit({
-      type: "session.status",
-      payload: { sessionId: session.id, status: "idle", title: session.title, cwd: session.cwd, model: session.model, temperature: session.temperature },
-    } as any);
+    session = sessions.getSession(session.id)!;
+    emitSessionStatus(session, "idle");
     return;
   }
 
   sessions.updateSession(session.id, { status: "running", lastPrompt: event.payload.prompt });
-  emit({
-    type: "session.status",
-    payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd, model: session.model, temperature: session.temperature },
-  } as any);
+  session = sessions.getSession(session.id)!;
+  emitSessionStatus(session, "running");
 
   if (session.title === "New Chat" && event.payload.prompt) {
     generateSessionTitle(event.payload.prompt, session.model)
       .then((newTitle) => {
         if (newTitle && newTitle !== "New Chat") {
           sessions.updateSession(session.id, { title: newTitle });
-          emit({
-            type: "session.status",
-            payload: { sessionId: session.id, status: session.status, title: newTitle, cwd: session.cwd, model: session.model, temperature: session.temperature },
-          } as any);
+          const updatedSession = sessions.getSession(session.id);
+          if (updatedSession) {
+            emitSessionStatus(updatedSession);
+          }
         }
       })
       .catch((error) => {

@@ -310,7 +310,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       case "session.status": {
-        const { sessionId, status, title, cwd, model, temperature } = event.payload;
+        const { sessionId, status, title, cwd, model, temperature, charter, charterHash, adrs } = event.payload;
         const isPendingStart = state.pendingStart;
 
         set((state) => {
@@ -328,7 +328,11 @@ export const useAppStore = create<AppState>((set, get) => ({
                 updatedAt: Date.now(),
                 // Mark as hydrated if this is a new session we just started
                 // This prevents session.history from overwriting new messages
-                hydrated: isPendingStart ? true : existing.hydrated
+                hydrated: isPendingStart ? true : existing.hydrated,
+                // Update charter/adrs if provided
+                charter: charter ?? existing.charter,
+                charterHash: charterHash ?? existing.charterHash,
+                adrs: adrs ?? existing.adrs
               }
             }
           };
