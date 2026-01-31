@@ -126,6 +126,8 @@ export type SessionInfo = {
   // Charter system fields
   charter?: CharterData;  // Session charter (scope/constraints)
   charterHash?: string;   // Hash for change detection
+  // ADR system fields
+  adrs?: ADRItem[];       // Architecture Decision Records
 };
 
 // Todo item type
@@ -189,6 +191,52 @@ export function computeCharterHash(charter: CharterData): string {
     hash = hash >>> 0; // Convert to unsigned 32-bit
   }
   return hash.toString(16).padStart(8, '0');
+}
+
+// ============================================================
+// ADR (Architecture Decision Record) System Types (Phase 2)
+// ============================================================
+
+// ADR status lifecycle
+export type ADRStatus = 
+  | 'proposed'    // Initial state - under discussion
+  | 'accepted'    // Approved and in effect
+  | 'rejected'    // Not approved
+  | 'deprecated'  // Was accepted, no longer recommended
+  | 'superseded'; // Replaced by another ADR
+
+// ADR types for categorization
+export type ADRType = 
+  | 'architectural'   // System architecture decisions
+  | 'technical'       // Technical implementation choices
+  | 'process'         // Process/workflow decisions
+  | 'charter-change'  // Changes to session charter
+  | 'constraint-override'; // Overriding a soft constraint
+
+// ADR item structure
+export interface ADRItem {
+  id: string;            // Format: adr-YYYY-MM-DD-<short_id>
+  title: string;         // Brief descriptive title
+  status: ADRStatus;     // Current status
+  type: ADRType;         // Category of decision
+  
+  // Core content
+  context: string;       // Why is this decision needed?
+  decision: string;      // What was decided?
+  consequences: string;  // What are the implications?
+  
+  // Optional fields
+  alternatives?: string;          // What alternatives were considered?
+  supersedes?: string;            // ID of ADR this supersedes
+  supersededBy?: string;          // ID of ADR that superseded this
+  charterRefs?: string[];         // Referenced charter item IDs
+  charterHashBefore?: string;     // Charter hash before change (for charter-change type)
+  charterHashAfter?: string;      // Charter hash after change
+  
+  // Metadata
+  createdAt: number;
+  updatedAt: number;
+  author?: string;       // Who made this decision
 }
 
 // ============================================================
@@ -355,7 +403,7 @@ export type CreateTaskPayload = {
 
 // Client -> Server events
 export type ClientEvent =
-  | { type: "session.start"; payload: { title: string; prompt: string; cwd?: string; allowedTools?: string; model?: string; temperature?: number; enableSessionGitRepo?: boolean; attachments?: Attachment[] } }
+  | { type: "session.start"; payload: { title: string; prompt: string; cwd?: string; allowedTools?: string; model?: string; temperature?: number; enableSessionGitRepo?: boolean; attachments?: Attachment[]; charter?: CharterData } }
   | { type: "session.continue"; payload: { sessionId: string; prompt: string; retry?: boolean; retryReason?: string; attachments?: Attachment[] } }
   | { type: "session.stop"; payload: { sessionId: string } }
   | { type: "session.delete"; payload: { sessionId: string } }

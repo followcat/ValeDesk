@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { ClientEvent, Attachment, AttachmentType } from "../types";
+import type { ClientEvent, Attachment, AttachmentType, CharterData } from "../types";
 import { useAppStore } from "../store/useAppStore";
 
 const DEFAULT_ALLOWED_TOOLS = "Read,Edit,Bash";
@@ -54,7 +54,7 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
   const activeSession = activeSessionId ? sessions[activeSessionId] : undefined;
   const isRunning = activeSession?.status === "running";
 
-  const handleSend = useCallback(async (options?: { enableSessionGitRepo?: boolean }) => {
+  const handleSend = useCallback(async (options?: { enableSessionGitRepo?: boolean; charter?: CharterData }) => {
     const trimmedPrompt = prompt.trim();
     const hasAttachments = attachments.length > 0;
 
@@ -80,7 +80,8 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
           model: selectedModel || undefined,
           temperature: sendTemperature ? selectedTemperature : undefined,
           enableSessionGitRepo: options?.enableSessionGitRepo ?? apiSettings?.enableSessionGitRepo ?? false,
-          attachments: hasAttachments ? attachments : undefined
+          attachments: hasAttachments ? attachments : undefined,
+          charter: options?.charter
         }
       });
       // Save selected model as default for future sessions
@@ -121,7 +122,7 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
     sendEvent({ type: "session.stop", payload: { sessionId: activeSessionId } });
   }, [activeSessionId, sendEvent]);
 
-  const handleStartFromModal = useCallback((options?: { enableSessionGitRepo?: boolean }) => {
+  const handleStartFromModal = useCallback((options?: { enableSessionGitRepo?: boolean; charter?: CharterData }) => {
     // Allow starting chat without cwd or prompt
     // If no cwd, file operations will be blocked by tools-executor
     handleSend(options);

@@ -593,6 +593,16 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
     enableSessionGitRepo: event.payload.enableSessionGitRepo,
   });
 
+  // Set charter if provided
+  if (event.payload.charter) {
+    const { computeCharterHash } = require('../agent/types.js');
+    const charterHash = computeCharterHash(event.payload.charter);
+    sessions.updateSession(session.id, { 
+      charter: event.payload.charter,
+      charterHash 
+    });
+  }
+
   ensureSessionGitRepo(session);
 
   const hasAttachments = Array.isArray(event.payload.attachments) && event.payload.attachments.length > 0;
