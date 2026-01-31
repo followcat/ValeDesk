@@ -416,19 +416,20 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
   return (
     <section className="fixed bottom-0 left-[280px] right-0 bg-gradient-to-t from-surface via-surface to-transparent pb-6 px-2 lg:pb-8 pt-8 z-20">
       <div className="mx-auto w-full max-w-full">
-        {/* Attachments preview */}
-        {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2 px-1">
-            {attachments.map((attachment) => (
-              <AttachmentPreview
-                key={attachment.id}
-                attachment={attachment}
-                onRemove={() => removeAttachment(attachment.id)}
-              />
-            ))}
-          </div>
-        )}
-        <div className="flex w-full items-end gap-3 rounded-2xl border border-ink-900/10 bg-surface px-4 py-3 shadow-card">
+        <div className="flex w-full flex-col gap-2 rounded-2xl border border-ink-900/10 bg-surface px-4 py-3 shadow-card">
+          {/* Attachments preview */}
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {attachments.map((attachment) => (
+                <AttachmentPreview
+                  key={attachment.id}
+                  attachment={attachment}
+                  onRemove={() => removeAttachment(attachment.id)}
+                />
+              ))}
+            </div>
+          )}
+          <div className="flex w-full items-end gap-3">
           {/* File attachment button */}
           <input
             type="file"
@@ -461,7 +462,7 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
           />
           <button
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${isRunning ? "bg-error text-white hover:bg-error/90" : "bg-accent text-white hover:bg-accent-hover"}`}
-            onClick={isRunning ? handleStop : handleSend}
+            onClick={isRunning ? handleStop : () => { void handleSend(); }}
             aria-label={isRunning ? "Stop session" : "Send prompt"}
           >
             {isRunning ? (
@@ -470,6 +471,7 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
               <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true"><path d="M3.4 20.6 21 12 3.4 3.4l2.8 7.2L16 12l-9.8 1.4-2.8 7.2Z" fill="currentColor" /></svg>
             )}
           </button>
+          </div>
         </div>
         <div className="mt-2 px-2 text-xs text-muted text-center">
           Press <span className="font-medium text-ink-700">Enter</span> to send • <span className="font-medium text-ink-700">Shift + Enter</span> for new line • Paste to add screenshot
