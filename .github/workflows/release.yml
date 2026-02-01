@@ -62,6 +62,9 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: ./scripts/build_sidecar.ps1
 
+      - name: Build Frontend
+        run: npm run build
+
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
