@@ -4,7 +4,6 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { diffLines as computeDiffLines } from "diff";
 import type { ChangedFile } from "./ChangedFiles";
 import { getPlatform } from "../platform";
-import { useAppStore } from "../store/useAppStore";
 
 // Check which platform is being used
 const isTauri = typeof (window as any).__TAURI__ !== "undefined";
@@ -36,13 +35,7 @@ export function DiffViewerModal({ file, files = [], cwd, sessionId, open, onClos
   const [error, setError] = useState<string | null>(null);
   const [currentChangeBlockIndex, setCurrentChangeBlockIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Get settings from store
-  const apiSettings = useAppStore((state) => state.apiSettings);
-  const sessionGitEnabled = useAppStore((state) =>
-    sessionId ? state.sessions[sessionId]?.enableSessionGitRepo : undefined
-  );
-  const useGitForDiff = sessionGitEnabled ?? apiSettings?.enableSessionGitRepo ?? false;
+  const useGitForDiff = true;
 
   // Find current file index in files array
   const currentFileIndex = useMemo(() => {
