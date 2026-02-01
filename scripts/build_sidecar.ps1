@@ -98,3 +98,10 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Sidecar binary built successfully: $OutputPath" -ForegroundColor Green
+
+# Ensure canonical binary name for Tauri bundling
+$CanonicalExt = if ($RustTarget -match "windows") { ".exe" } else { "" }
+$CanonicalName = "valera-sidecar$CanonicalExt"
+$CanonicalPath = Join-Path $BinDir $CanonicalName
+Copy-Item -Force $OutputPath $CanonicalPath
+Write-Host "Copied sidecar binary to: $CanonicalPath" -ForegroundColor Green
