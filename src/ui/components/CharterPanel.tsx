@@ -21,14 +21,51 @@ export function CharterPanel({
 }: CharterPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   if (!charter) {
     return (
       <div className="rounded-lg border border-ink-200 bg-surface-secondary p-3">
-        <div className="flex items-center gap-2 text-ink-400">
-          <span className="text-lg">📋</span>
-          <span className="text-sm">No charter defined for this session</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-ink-400">
+            <span className="text-lg">📋</span>
+            <span className="text-sm">No charter defined for this session</span>
+          </div>
+          <button 
+            onClick={() => setShowHelp(!showHelp)}
+            className="text-xs text-ink-400 hover:text-ink-600 transition-colors"
+          >
+            如何使用?
+          </button>
         </div>
+        {showHelp && (
+          <div className="mt-3 p-3 bg-ink-50 rounded text-xs text-ink-600 space-y-2">
+            <p className="font-medium text-ink-700">💡 Charter (会话宪章) 使用指南:</p>
+            <div className="space-y-1.5">
+              <p><span className="font-medium">创建 Charter:</span></p>
+              <ul className="list-disc list-inside space-y-0.5 ml-2">
+                <li>新建会话时选择合适的 Charter 模板</li>
+                <li>或者说: "请创建一个 Charter，目标是..."</li>
+              </ul>
+              
+              <p><span className="font-medium">Charter 包含:</span></p>
+              <ul className="list-disc list-inside space-y-0.5 ml-2">
+                <li><strong>🎯 Goal:</strong> 会话的核心目标</li>
+                <li><strong>🚫 Non-Goals:</strong> 明确不做的事情</li>
+                <li><strong>✅ Definition of Done:</strong> 完成标准</li>
+                <li><strong>⚠️ Constraints:</strong> 软约束（可通过 ADR 修改）</li>
+                <li><strong>🔒 Invariants:</strong> 硬约束（绝不可违反）</li>
+                <li><strong>📖 Glossary:</strong> 术语表</li>
+              </ul>
+
+              <p><span className="font-medium">更新 Charter:</span></p>
+              <ul className="list-disc list-inside space-y-0.5 ml-2">
+                <li>说: "请更新 Charter，添加约束：..."</li>
+                <li>每次更新会自动创建 ADR 记录变更原因</li>
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -82,10 +119,39 @@ export function CharterPanel({
             </span>
           )}
         </div>
-        <span className={`text-ink-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-          ▼
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowHelp(!showHelp);
+            }}
+            className="text-xs text-ink-400 hover:text-ink-600 px-2 py-1 rounded hover:bg-ink-100 transition-colors"
+          >
+            ?
+          </button>
+          <span className={`text-ink-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+            ▼
+          </span>
+        </div>
       </button>
+
+      {/* Help Section */}
+      {showHelp && (
+        <div className="px-3 pb-3 border-t border-ink-100">
+          <div className="mt-3 p-3 bg-ink-50 rounded text-xs text-ink-600 space-y-2">
+            <p className="font-medium text-ink-700">💡 如何使用 Charter:</p>
+            <div className="space-y-1">
+              <p><strong>更新 Charter:</strong> 说 "请更新 Charter，添加约束：..."</p>
+              <p><strong>自动 ADR:</strong> 每次更新会自动创建决策记录</p>
+              <p><strong>约束类型:</strong></p>
+              <ul className="list-disc list-inside ml-2 space-y-0.5">
+                <li><strong>⚠️ Constraints:</strong> 软约束（可通过 ADR 修改）</li>
+                <li><strong>🔒 Invariants:</strong> 硬约束（绝不违反）</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       {isExpanded && (
