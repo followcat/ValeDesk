@@ -892,8 +892,7 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
     setTesting(true);
     setAvailableModels([]);
 
-    // API key not required for Claude Code
-    if (type !== 'claude-code' && !apiKey.trim()) {
+    if (!apiKey.trim()) {
       setError(t("settings.llmProviders.errors.apiKeyRequired"));
       setTesting(false);
       return;
@@ -909,8 +908,8 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
       id: `temp-${Date.now()}`,
       type,
       name: name.trim() || t("settings.llmProviders.testProvider"),
-      apiKey: type === 'claude-code' ? '' : apiKey.trim(),
-      baseUrl: type === 'openrouter' || type === 'claude-code' ? undefined : (type === 'zai' ? baseUrl.trim() : baseUrl.trim()),
+      apiKey: apiKey.trim(),
+      baseUrl: type === 'openrouter' ? undefined : baseUrl.trim(),
       zaiApiPrefix: type === 'zai' ? zaiApiPrefix : undefined,
       enabled: true,
     };
@@ -955,8 +954,7 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
       setError(t("settings.llmProviders.errors.nameRequired"));
       return;
     }
-    // API key not required for Claude Code
-    if (type !== 'claude-code' && !apiKey.trim()) {
+    if (!apiKey.trim()) {
       setError(t("settings.llmProviders.errors.apiKeyRequired"));
       return;
     }
@@ -970,8 +968,8 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
       id: `${type}-${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
       type,
       name: name.trim(),
-      apiKey: type === 'claude-code' ? '' : apiKey.trim(),
-      baseUrl: type === 'openrouter' || type === 'claude-code' ? undefined : (type === 'zai' ? baseUrl.trim() : baseUrl.trim()),
+      apiKey: apiKey.trim(),
+      baseUrl: type === 'openrouter' ? undefined : baseUrl.trim(),
       zaiApiPrefix: type === 'zai' ? zaiApiPrefix : undefined,
       enabled: true,
     };
@@ -1050,7 +1048,6 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
                   <option value="openai">{t("settings.llmProviders.providerOpenAI")}</option>
                   <option value="openrouter">{t("settings.llmProviders.providerOpenRouter")}</option>
                   <option value="zai">{t("settings.llmProviders.providerZai")}</option>
-                  <option value="claude-code">{t("settings.llmProviders.providerClaudeCode")}</option>
                 </select>
               </div>
 
@@ -1085,42 +1082,24 @@ function AddProviderButton({ onAdd, providers, models, setLlmProviders, setLlmMo
                 </div>
               )}
 
-              {/* API Key - not needed for Claude Code */}
-              {type !== 'claude-code' && (
-                <div>
-                  <label className="block text-sm font-medium text-ink-700 mb-2">
-                    {t("settings.llmProviders.apiKey")}
-                  </label>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder={t("settings.llmProviders.apiKeyPlaceholder")}
-                    className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20"
-                  />
-                </div>
-              )}
-
-              {/* Claude Code info */}
-              {type === 'claude-code' && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-800">
-                    <Trans
-                      i18nKey="settings.llmProviders.claudeCodeInfo"
-                      components={{
-                        strong: <strong />,
-                        code: <code className="bg-amber-100 px-1 rounded" />
-                      }}
-                    />
-                  </p>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-2">
+                  {t("settings.llmProviders.apiKey")}
+                </label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={t("settings.llmProviders.apiKeyPlaceholder")}
+                  className="w-full px-4 py-2.5 text-sm border border-ink-900/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20"
+                />
+              </div>
               
               {/* Test Connection Button */}
               <button
                 type="button"
                 onClick={handleTestConnection}
-                disabled={testing || (type !== 'claude-code' && !apiKey.trim()) || (type === 'openai' && !baseUrl.trim())}
+                disabled={testing || !apiKey.trim() || (type === 'openai' && !baseUrl.trim())}
                 className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {testing ? (

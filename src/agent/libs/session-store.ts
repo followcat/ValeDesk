@@ -12,7 +12,6 @@ export type PendingPermission = {
 export type Session = {
   id: string;
   title: string;
-  claudeSessionId?: string;
   status: SessionStatus;
   cwd?: string;
   allowedTools?: string;
@@ -37,7 +36,6 @@ export type StoredSession = {
   lastPrompt?: string;
   model?: string;
   threadId?: string; // Thread ID for multi-thread sessions
-  claudeSessionId?: string;
   isPinned?: boolean;
   createdAt: number;
   updatedAt: number;
@@ -101,13 +99,12 @@ export class SessionStore {
     this.db
       .prepare(
         `insert into sessions
-          (id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, enable_session_git_repo, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, title, status, cwd, allowed_tools, last_prompt, model, thread_id, enable_session_git_repo, created_at, updated_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
         session.title,
-        session.claudeSessionId ?? null,
         session.status,
         session.cwd ?? null,
         session.allowedTools ?? null,
@@ -138,7 +135,7 @@ export class SessionStore {
     // Try to load from database
     const row = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, enable_session_git_repo
+        `select id, title, status, cwd, allowed_tools, last_prompt, model, thread_id, enable_session_git_repo
          from sessions
          where id = ?`
       )
@@ -152,7 +149,6 @@ export class SessionStore {
     const session: Session = {
       id: String(row.id),
       title: String(row.title),
-      claudeSessionId: row.claude_session_id ? String(row.claude_session_id) : undefined,
       status: row.status as SessionStatus,
       cwd: row.cwd ? String(row.cwd) : undefined,
       allowedTools: row.allowed_tools ? String(row.allowed_tools) : undefined,
@@ -169,7 +165,7 @@ export class SessionStore {
   listSessions(): StoredSession[] {
     const rows = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, is_pinned, created_at, updated_at, input_tokens, output_tokens, enable_session_git_repo
+        `select id, title, status, cwd, allowed_tools, last_prompt, model, thread_id, is_pinned, created_at, updated_at, input_tokens, output_tokens, enable_session_git_repo
          from sessions
          order by updated_at desc`
       )
@@ -183,7 +179,6 @@ export class SessionStore {
       lastPrompt: row.last_prompt ? String(row.last_prompt) : undefined,
       model: row.model ? String(row.model) : undefined,
       threadId: row.thread_id ? String(row.thread_id) : undefined,
-      claudeSessionId: row.claude_session_id ? String(row.claude_session_id) : undefined,
       isPinned: row.is_pinned ? Boolean(row.is_pinned) : false,
       createdAt: Number(row.created_at),
       updatedAt: Number(row.updated_at),
@@ -213,7 +208,7 @@ export class SessionStore {
 
     const sessionRow = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, is_pinned, created_at, updated_at, input_tokens, output_tokens, todos, file_changes
+        `select id, title, status, cwd, allowed_tools, last_prompt, model, thread_id, is_pinned, created_at, updated_at, input_tokens, output_tokens, todos, file_changes
          from sessions
          ${whereClause}`
       )
@@ -257,7 +252,6 @@ export class SessionStore {
         lastPrompt: sessionRow.last_prompt ? String(sessionRow.last_prompt) : undefined,
         model: sessionRow.model ? String(sessionRow.model) : undefined,
         threadId: sessionRow.thread_id ? String(sessionRow.thread_id) : undefined,
-        claudeSessionId: sessionRow.claude_session_id ? String(sessionRow.claude_session_id) : undefined,
         isPinned: sessionRow.is_pinned ? Boolean(sessionRow.is_pinned) : false,
         createdAt: Number(sessionRow.created_at),
         updatedAt: Number(sessionRow.updated_at),
@@ -274,7 +268,7 @@ export class SessionStore {
   getSessionHistoryPage(id: string, limit: number, beforeCreatedAt?: number): SessionHistoryPage | null {
     const sessionRow = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, is_pinned, created_at, updated_at, input_tokens, output_tokens, todos, file_changes
+        `select id, title, status, cwd, allowed_tools, last_prompt, model, thread_id, is_pinned, created_at, updated_at, input_tokens, output_tokens, todos, file_changes
          from sessions
          where id = ?`
       )
@@ -337,7 +331,6 @@ export class SessionStore {
         lastPrompt: sessionRow.last_prompt ? String(sessionRow.last_prompt) : undefined,
         model: sessionRow.model ? String(sessionRow.model) : undefined,
         threadId: sessionRow.thread_id ? String(sessionRow.thread_id) : undefined,
-        claudeSessionId: sessionRow.claude_session_id ? String(sessionRow.claude_session_id) : undefined,
         isPinned: sessionRow.is_pinned ? Boolean(sessionRow.is_pinned) : false,
         createdAt: Number(sessionRow.created_at),
         updatedAt: Number(sessionRow.updated_at),
@@ -630,7 +623,6 @@ export class SessionStore {
     const values: Array<string | number | null> = [];
     const updatable = {
       title: "title",
-      claudeSessionId: "claude_session_id",
       status: "status",
       cwd: "cwd",
       allowedTools: "allowed_tools",
@@ -662,7 +654,6 @@ export class SessionStore {
       `create table if not exists sessions (
         id text primary key,
         title text,
-        claude_session_id text,
         status text not null,
         cwd text,
         allowed_tools text,
@@ -766,7 +757,7 @@ export class SessionStore {
   private loadSessions(): void {
     const rows = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, model, thread_id, enable_session_git_repo
+        `select id, title, status, cwd, allowed_tools, last_prompt, model, thread_id, enable_session_git_repo
          from sessions`
       )
       .all();
@@ -774,7 +765,6 @@ export class SessionStore {
       const session: Session = {
         id: String(row.id),
         title: String(row.title),
-        claudeSessionId: row.claude_session_id ? String(row.claude_session_id) : undefined,
         status: row.status as SessionStatus,
         cwd: row.cwd ? String(row.cwd) : undefined,
         allowedTools: row.allowed_tools ? String(row.allowed_tools) : undefined,

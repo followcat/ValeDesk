@@ -52,7 +52,12 @@ export function loadLLMProviderSettings(): LLMProviderSettings | null {
       return { providers: settings.providers || [], models: [] };
     }
 
-    return settings;
+    const supportedTypes = new Set(['openai', 'openrouter', 'zai']);
+    const providers = settings.providers.filter((provider) => supportedTypes.has(provider.type));
+    const providerIds = new Set(providers.map((provider) => provider.id));
+    const models = settings.models.filter((model) => providerIds.has(model.providerId));
+
+    return { providers, models };
   } catch (error) {
     console.error("[LLM Providers] Failed to load settings:", error);
     return { providers: [], models: [] };

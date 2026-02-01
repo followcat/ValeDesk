@@ -144,8 +144,8 @@ describe("runner-openai tool flow", () => {
         }
       };
 
-      import("../src/agent/libs/runner-openai.ts").then(({ runClaude }) => {
-        runClaude({
+      import("../src/agent/libs/runner-openai.ts").then(({ runOpenAI }) => {
+        runOpenAI({
           prompt: "hi",
           session: {
             id: "s1",
