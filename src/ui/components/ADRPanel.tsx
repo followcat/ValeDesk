@@ -34,7 +34,7 @@ const typeConfig: Record<ADRType, { icon: string; label: string }> = {
 };
 
 export function ADRPanel({ adrs, onStatusChange }: ADRPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false); // Default collapsed to save space
   const [selectedADR, setSelectedADR] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
 
@@ -266,7 +266,7 @@ export function ADRPanel({ adrs, onStatusChange }: ADRPanelProps) {
 
       {/* Content */}
       {isExpanded && (
-        <div className="px-3 pb-3 border-t border-ink-100 space-y-2 pt-3">
+        <div className="px-3 pb-3 border-t border-ink-100 space-y-2 pt-3 max-h-96 overflow-y-auto">
           {sortedADRs.map(renderADRItem)}
         </div>
       )}

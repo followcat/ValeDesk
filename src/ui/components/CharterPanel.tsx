@@ -19,7 +19,7 @@ export function CharterPanel({
   isEditable = false,
   onEditCharter
 }: CharterPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false); // Default collapsed to save space
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
 
@@ -155,7 +155,7 @@ export function CharterPanel({
 
       {/* Content */}
       {isExpanded && (
-        <div className="px-3 pb-3 border-t border-ink-100">
+        <div className="px-3 pb-3 border-t border-ink-100 max-h-96 overflow-y-auto">
           {/* Goal */}
           <div className="mt-3">
             <div className="flex items-center gap-2 mb-1">
