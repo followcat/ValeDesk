@@ -1,6 +1,6 @@
 
 /**
- * OpenAI-based runner - replacement for Claude SDK
+ * OpenAI-based runner
  * Gives us full control over requests, tools, and streaming
  */
 
@@ -60,7 +60,6 @@ function saveAttachmentToDisk(attachment: Attachment, cwd: string): string | nul
 export type RunnerOptions = {
   prompt: string;
   session: Session;
-  resumeSessionId?: string;
   onEvent: (event: ServerEvent) => void;
   onSessionUpdate?: (updates: Partial<Session>) => void;
   attachments?: Attachment[];
@@ -130,7 +129,7 @@ const redactMessagesForLog = (messages: ChatMessage[]) => {
 };
 
 
-export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
+export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
   const { prompt, session, onEvent, onSessionUpdate, attachments } = options;
   // Initialize execution logger for this session
   executionLogger.setSession(session.id);
@@ -777,11 +776,6 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         permissionMode: currentGuiSettings?.permissionMode || 'ask',
         memoryEnabled: currentGuiSettings?.enableMemory || false
       });
-
-      // Update session with ID for resume support
-      if (onSessionUpdate) {
-        onSessionUpdate({ claudeSessionId: session.id });
-      }
 
       // Main agent loop
       iterationCount = 0;

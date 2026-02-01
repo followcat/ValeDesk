@@ -1,14 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store/useAppStore";
-import type {
-  PermissionResult,
-  SDKAssistantMessage,
-  SDKMessage,
-  SDKResultMessage,
-  SDKUserMessage
-} from "@anthropic-ai/claude-agent-sdk";
-import type { StreamMessage, Attachment, FileChange } from "../types";
+import type { StreamMessage, Attachment, FileChange, PermissionResult, SDKMessage } from "../types";
 import type { PermissionRequest } from "../store/useAppStore";
 import MDContent from "../render/markdown";
 import { getPlatform } from "../platform";
@@ -17,8 +10,44 @@ import { ChangedFiles, type ChangedFile } from "./ChangedFiles";
 import { DiffViewerModal } from "./DiffViewerModal";
 import * as Dialog from "@radix-ui/react-dialog";
 
+type ToolUseContent = {
+  type: "tool_use";
+  id: string;
+  name: string;
+  input?: unknown;
+  [key: string]: unknown;
+};
+
+type ToolResultContent = {
+  type: "tool_result";
+  tool_use_id?: string;
+  content: string;
+  is_error?: boolean;
+  [key: string]: unknown;
+};
+
+type AssistantContent =
+  | { type: "text"; text: string }
+  | { type: "thinking"; thinking: string }
+  | ToolUseContent
+  | { type: string; [key: string]: unknown };
+
+type SDKAssistantMessage = {
+  type: "assistant";
+  message: {
+    content: AssistantContent[];
+    [key: string]: unknown;
+  };
+};
+
+type SDKResultMessage = {
+  type: "result";
+  subtype?: string;
+  usage?: { input_tokens?: number; output_tokens?: number };
+  [key: string]: unknown;
+};
+
 type MessageContent = SDKAssistantMessage["message"]["content"][number];
-type ToolResultContent = SDKUserMessage["message"]["content"][number];
 type ToolStatus = "pending" | "success" | "error";
 const toolStatusMap = new Map<string, ToolStatus>();
 const toolStatusListeners = new Set<() => void>();

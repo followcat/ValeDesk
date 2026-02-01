@@ -1,7 +1,6 @@
 import { BrowserWindow, powerMonitor, shell } from "electron";
 import type { ClientEvent, ServerEvent, MultiThreadTask, ApiSettings } from "./types.js";
-import { runClaude as runClaudeSDK, type RunnerHandle } from "./libs/runner.js"; // Claude Code SDK runner (subscription)
-import { runClaude as runOpenAI } from "./libs/runner-openai.js"; // OpenAI SDK runner
+import { runOpenAI, type RunnerHandle } from "./libs/runner-openai.js"; // OpenAI SDK runner
 import { SessionStore } from "./libs/session-store.js";
 import type { SessionHistoryPage } from "./libs/session-store.js";
 import { SchedulerStore } from "./libs/scheduler-store.js";
@@ -311,16 +310,11 @@ app.on("ready", () => {
 (global as any).schedulerStore = schedulerStore;
 
 /**
- * Select appropriate runner based on model/provider type
- * - claude-code:: prefix -> use Claude Code SDK (subscription)
- * - otherwise -> use OpenAI SDK compatible runner
+ * Select appropriate runner based on model/provider type.
+ * Currently only the OpenAI-compatible runner is supported.
  */
-function selectRunner(model: string | undefined) {
-  if (model?.startsWith('claude-code::')) {
-    console.log('[IPC] Using Claude Code SDK runner for model:', model);
-    return runClaudeSDK;
-  }
-  console.log('[IPC] Using OpenAI SDK runner for model:', model);
+function selectRunner(_model: string | undefined) {
+  console.log('[IPC] Using OpenAI SDK runner');
   return runOpenAI;
 }
 
@@ -517,11 +511,10 @@ Format your response clearly with sections.`;
   });
 
   try {
-    const runClaude = selectRunner(session.model);
-    const handle = await runClaude({
+    const runRunner = selectRunner(session.model);
+    const handle = await runRunner({
       prompt: summaryPrompt,
       session,
-      resumeSessionId: undefined,
       onEvent: emitFn,
       onSessionUpdate: (updates) => {
         sessions.updateSession(summarySession.id, updates);
@@ -672,7 +665,6 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
     selectRunner(session.model)({
       prompt: event.payload.prompt,
       session,
-      resumeSessionId: session.claudeSessionId,
       attachments: event.payload.attachments,
       onEvent: emit,
       onSessionUpdate: (updates) => {
@@ -714,8 +706,8 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
     // Subscribe this window to the session
     sessionManager.setWindowSession(windowId, session.id);
 
-    // If session has no claudeSessionId yet (was created empty), treat this as first run
-    const isFirstRun = !session.claudeSessionId;
+    // If session has no prior prompt (was created empty), treat this as first run
+    const isFirstRun = !session.lastPrompt;
     
     // Generate title for empty chats on first real prompt
     let sessionTitle = session.title;
@@ -768,7 +760,6 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
     selectRunner(session.model)({
       prompt: event.payload.prompt,
       session,
-      resumeSessionId: isFirstRun ? undefined : session.claudeSessionId,
       attachments: event.payload.attachments,
       onEvent: emit,
       onSessionUpdate: (updates) => {
@@ -954,7 +945,6 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
     selectRunner(session.model)({
       prompt: newPrompt,
       session,
-      resumeSessionId: session.claudeSessionId,
       onEvent: emit,
       onSessionUpdate: (updates) => {
         sessions.updateSession(session.id, updates);
@@ -1195,7 +1185,6 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
           selectRunner(thread.model)({
             prompt: consensusPrompt,
             session: thread,
-            resumeSessionId: thread.claudeSessionId,
             onEvent: emit,
             onSessionUpdate: (updates) => {
               sessions.updateSession(threadId, updates);
@@ -1232,7 +1221,6 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
           selectRunner(thread.model)({
             prompt: taskPrompt,
             session: thread,
-            resumeSessionId: thread.claudeSessionId,
             onEvent: emit,
             onSessionUpdate: (updates) => {
               sessions.updateSession(threadId, updates);
@@ -1296,7 +1284,6 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
           selectRunner(thread.model)({
             prompt: consensusPrompt,
             session: thread,
-            resumeSessionId: thread.claudeSessionId,
             onEvent: emit,
             onSessionUpdate: (updates) => {
               sessions.updateSession(threadId, updates);
@@ -1333,7 +1320,6 @@ export async function handleClientEvent(event: ClientEvent, windowId: number) {
           selectRunner(thread.model)({
             prompt: taskPrompt,
             session: thread,
-            resumeSessionId: thread.claudeSessionId,
             onEvent: emit,
             onSessionUpdate: (updates) => {
               sessions.updateSession(threadId, updates);

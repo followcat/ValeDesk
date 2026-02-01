@@ -17,7 +17,6 @@ export type PendingPermission = {
 export type Session = {
   id: string;
   title: string;
-  claudeSessionId?: string;
   status: SessionStatus;
   cwd?: string;
   allowedTools?: string;
@@ -42,7 +41,6 @@ export type StoredSession = {
   lastPrompt?: string;
   model?: string;
   threadId?: string;
-  claudeSessionId?: string;
   isPinned?: boolean;
   createdAt: number;
   updatedAt: number;
@@ -143,7 +141,6 @@ export class MemorySessionStore {
       lastPrompt: session.lastPrompt,
       model: session.model,
       threadId: session.threadId,
-      claudeSessionId: session.claudeSessionId,
       isPinned: false,
       createdAt: now,
       updatedAt: now,
@@ -168,7 +165,6 @@ export class MemorySessionStore {
         lastPrompt: session.lastPrompt,
         model: session.model,
         threadId: session.threadId,
-        claudeSessionId: session.claudeSessionId,
         isPinned: false,
         createdAt: now,
         updatedAt: now,

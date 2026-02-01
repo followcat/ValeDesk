@@ -12,7 +12,6 @@ import {
 import { sessionManager } from "./session-manager.js";
 import { generateSessionTitle } from "./libs/util.js";
 import type { ClientEvent } from "./types.js";
-import "./libs/claude-settings.js";
 import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import { basename, extname, join, normalize, relative, resolve, isAbsolute } from "path";

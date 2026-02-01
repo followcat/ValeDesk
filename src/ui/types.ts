@@ -1,4 +1,16 @@
-import type { SDKMessage, PermissionResult } from "@anthropic-ai/claude-agent-sdk";
+export type PermissionResult = {
+  behavior: "allow" | "deny";
+  updatedInput?: unknown;
+  message?: string;
+};
+
+export type SDKMessage = {
+  type: string;
+  message?: any;
+  subtype?: string;
+  usage?: { input_tokens?: number; output_tokens?: number };
+  [key: string]: unknown;
+};
 
 // Attachment types for multimodal support
 export type AttachmentType = 'image' | 'video' | 'audio';
@@ -65,7 +77,6 @@ export type SessionInfo = {
   id: string;
   title: string;
   status: SessionStatus;
-  claudeSessionId?: string;
   cwd?: string;
   model?: string;
   isPinned?: boolean;
@@ -180,7 +191,7 @@ export type ModelInfo = {
 };
 
 // LLM Provider types
-export type LLMProviderType = 'openai' | 'openrouter' | 'zai' | 'claude-code';
+export type LLMProviderType = 'openai' | 'openrouter' | 'zai';
 
 export type ZaiApiUrlPrefix = 'default' | 'coding';
 
