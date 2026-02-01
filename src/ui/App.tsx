@@ -565,8 +565,6 @@ function App() {
               onConfirmChanges={handleConfirmChanges}
               onRollbackChanges={handleRollbackChanges}
             />
-            <CharterPanel charter={activeSession.charter} />
-            <ADRPanel adrs={activeSession.adrs} />
           </div>
         )}
 
