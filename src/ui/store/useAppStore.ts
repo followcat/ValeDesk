@@ -205,7 +205,11 @@ export const useAppStore = create<AppState>((set, get) => ({
             createdAt: session.createdAt,
             updatedAt: session.updatedAt,
             inputTokens: session.inputTokens,
-            outputTokens: session.outputTokens
+            outputTokens: session.outputTokens,
+            // Preserve charter/adrs from session list or existing state
+            charter: session.charter ?? existing.charter,
+            charterHash: session.charterHash ?? existing.charterHash,
+            adrs: session.adrs ?? existing.adrs
           };
         }
 
