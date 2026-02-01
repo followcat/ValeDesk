@@ -35,7 +35,7 @@
 		"dev": "node scripts/dev.cjs",
 		"dev:tauri": "node scripts/dev-tauri.cjs",
 		"dev:react": "vite --host 127.0.0.1 --port 5173 --strictPort",
-		"build": "tsc -b && vite build",
+		"build": "tsc -b && vite build --mode production",
 		"lint": "eslint .",
 		"preview": "vite preview",
 		"transpile:electron": "tsc --project src/agent/tsconfig.json",
