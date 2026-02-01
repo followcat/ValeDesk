@@ -589,7 +589,7 @@ app.on("ready", () => {
     }
   });
 
-  const isValidCommit = (commit: string) => /^[0-9a-f]{7,64}$/i.test(commit);
+  const isValidCommit = (commit: string) => /^[0-9a-f]{7,64}([~^][0-9]*)*$/i.test(commit);
 
   ipcMainHandle("get-file-content-at-commit", async (_, filePath: string, cwd: string, commit: string) => {
     try {

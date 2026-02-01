@@ -333,6 +333,7 @@ export function TodoPanel({
         file={selectedFile}
         files={changedFiles}
         cwd={cwd}
+        sessionId={activeSessionId ?? undefined}
         open={diffModalOpen}
         onClose={() => {
           setDiffModalOpen(false);

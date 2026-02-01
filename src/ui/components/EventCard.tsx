@@ -184,6 +184,7 @@ const SessionResult = ({ message, fileChanges, sessionId, onConfirmChanges, onRo
         file={selectedFile}
         files={changedFiles}
         cwd={cwd}
+        sessionId={sessionId}
         open={diffModalOpen}
         onClose={() => {
           setDiffModalOpen(false);
@@ -377,7 +378,6 @@ const ToolUseCard = ({
   sessionId?: string;
   cwd?: string;
 }) => {
-  const { t } = useTranslation();
   if (messageContent.type !== "tool_use") return null;
   
   const toolStatus = useToolStatus(messageContent.id);
@@ -385,8 +385,6 @@ const ToolUseCard = ({
   const isPending = !toolStatus || toolStatus === "pending";
   const shouldShowDot = toolStatus === "success" || toolStatus === "error" || showIndicator;
   const [isExpanded, setIsExpanded] = useState(false);
-  const [diffModalOpen, setDiffModalOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<ChangedFile | null>(null);
 
   useEffect(() => {
     if (messageContent?.id && !toolStatusMap.has(messageContent.id)) setToolStatus(messageContent.id, "pending");
@@ -428,50 +426,6 @@ const ToolUseCard = ({
     }
   };
 
-  // Check if this is a file operation tool with diff snapshot
-  const diffSnapshot = input?.diffSnapshot as { oldContent: string; newContent: string; additions: number; deletions: number; filePath: string } | undefined;
-  const hasDiffSnapshot = Boolean(diffSnapshot && diffSnapshot.additions + diffSnapshot.deletions > 0);
-  
-  // Debug logging for file tools
-  useEffect(() => {
-    if ((messageContent.name === 'write_file' || messageContent.name === 'edit_file' || 
-         messageContent.name === 'Write' || messageContent.name === 'Edit') && messageContent.id) {
-      console.log(`[ToolUseCard] ========== RENDERING ${messageContent.name} ==========`);
-      console.log(`[ToolUseCard] ID:`, messageContent.id);
-      console.log(`[ToolUseCard] Has input:`, !!input);
-      console.log(`[ToolUseCard] Has diffSnapshot:`, !!diffSnapshot);
-      console.log(`[ToolUseCard] Input keys:`, input ? Object.keys(input) : []);
-      console.log(`[ToolUseCard] messageContent.input keys:`, messageContent.input ? Object.keys(messageContent.input) : []);
-      console.log(`[ToolUseCard] messageContent.input === input:`, messageContent.input === input);
-      if (diffSnapshot) {
-        console.log(`[ToolUseCard] DiffSnapshot:`, {
-          additions: diffSnapshot.additions,
-          deletions: diffSnapshot.deletions,
-          filePath: diffSnapshot.filePath,
-          hasOldContent: !!diffSnapshot.oldContent,
-          hasNewContent: !!diffSnapshot.newContent
-        });
-      } else {
-        console.log(`[ToolUseCard] ⚠ DiffSnapshot is NULL/UNDEFINED`);
-        console.log(`[ToolUseCard] Full messageContent:`, messageContent);
-      }
-      console.log(`[ToolUseCard] ====================================================`);
-    }
-  }, [messageContent, input, diffSnapshot]);
-
-  const handleViewDiff = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (diffSnapshot) {
-      setSelectedFile({
-        file_path: diffSnapshot.filePath,
-        lines_added: diffSnapshot.additions,
-        lines_removed: diffSnapshot.deletions,
-        content_old: diffSnapshot.oldContent,
-        content_new: diffSnapshot.newContent
-      });
-      setDiffModalOpen(true);
-    }
-  };
 
   // Check if this tool needs permission
   const isActiveRequest = permissionRequest && permissionRequest.toolUseId === messageContent.id;
@@ -502,23 +456,7 @@ const ToolUseCard = ({
           <div className="flex flex-row items-center gap-2 tool-use-item min-w-0 flex-1">
             <span className="inline-flex items-center rounded-md text-accent py-0.5 text-sm font-medium shrink-0">{messageContent.name}</span>
             <span className="text-sm text-muted truncate">{getToolInfo()}</span>
-            {hasDiffSnapshot && diffSnapshot && (
-              <span className="text-xs text-muted shrink-0">
-                <span className="text-success font-medium">+{diffSnapshot.additions}</span>
-                <span className="text-ink-400 mx-1">·</span>
-                <span className="text-error font-medium">-{diffSnapshot.deletions}</span>
-              </span>
-            )}
           </div>
-          {hasDiffSnapshot && (
-            <button
-              onClick={handleViewDiff}
-              className="shrink-0 text-xs font-medium text-accent hover:text-accent/80 px-2 py-1 rounded-md border border-accent/20 hover:border-accent/40 bg-accent/5 hover:bg-accent/10 transition-colors"
-              title={t("eventCard.viewDiff")}
-            >
-              {t("eventCard.viewDiff")}
-            </button>
-          )}
           {canExpand && (
             <span className="text-xs text-muted shrink-0">{isExpanded ? "▲" : "▼"}</span>
           )}
@@ -529,21 +467,6 @@ const ToolUseCard = ({
           </pre>
         )}
       </div>
-      {hasDiffSnapshot && (
-        <DiffViewerModal
-          file={selectedFile}
-          files={selectedFile ? [selectedFile] : []}
-          cwd={cwd}
-          open={diffModalOpen}
-          onClose={() => {
-            setDiffModalOpen(false);
-            setSelectedFile(null);
-          }}
-          onFileChange={(file) => {
-            setSelectedFile(file);
-          }}
-        />
-      )}
     </>
   );
 };

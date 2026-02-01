@@ -38,7 +38,6 @@ export type ApiSettings = {
   enableDuckDuckGo?: boolean; // Enable search/search_news/search_images (no API key needed)
   enableFetchTools?: boolean; // Enable fetch/fetch_json/download tools
   enableImageTools?: boolean; // Enable attach_image tool
-  useGitForDiff?: boolean; // Use git for diff (true) or file snapshots (false)
   llmProviders?: LLMProviderSettings; // LLM providers and models configuration
   language?: 'auto' | 'en' | 'zh-CN'; // UI language preference
 
