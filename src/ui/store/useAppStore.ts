@@ -687,7 +687,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const { title, prompt } = event.payload as any;
         if (prompt) {
           // Use scheduler default model, or fallback to first enabled model
-          const { schedulerDefaultModel, llmModels } = get();
+          const { schedulerDefaultModel, llmModels, apiSettings } = get();
           let model = schedulerDefaultModel;
           
           if (!model) {

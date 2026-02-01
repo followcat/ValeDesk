@@ -163,8 +163,8 @@ const SessionResult = ({ message, fileChanges, sessionId, onConfirmChanges, onRo
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[14px]">
             <span className="font-normal">{t("eventCard.tokens")}</span>
-            <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">{t("eventCard.tokenInput", { count: formatMillions(message.usage?.input_tokens) })}</span>
-            <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">{t("eventCard.tokenOutput", { count: formatMillions(message.usage?.output_tokens) })}</span>
+            <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">{t("eventCard.tokenInput", { count: message.usage?.input_tokens || 0 })}</span>
+            <span className="inline-flex items-center rounded-full bg-surface-tertiary px-2.5 py-0.5 text-ink-700 text-[13px]">{t("eventCard.tokenOutput", { count: message.usage?.output_tokens || 0 })}</span>
             {hasCost && (
               <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-accent text-[13px]">
                 ${formatUsd(message.total_cost_usd)}
