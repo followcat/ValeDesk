@@ -106,7 +106,12 @@ export type UserPromptMessage = {
   attachments?: Attachment[];
 };
 
-export type StreamMessage = SDKMessage | UserPromptMessage;
+export type SystemSummaryMessage = {
+  type: "system_summary";
+  summary: string;
+};
+
+export type StreamMessage = SDKMessage | UserPromptMessage | SystemSummaryMessage;
 
 export type SessionStatus = "idle" | "running" | "completed" | "error";
 

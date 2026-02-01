@@ -32,6 +32,16 @@ import {
   formatComplianceResult,
   type ComplianceResult 
 } from "./compliance-gate.js";
+import {
+  DEFAULT_CONTEXT_CONFIG,
+  estimateTokensForChatMessages,
+  getCompactionCutoffIndex,
+  getUsageRatio,
+  loadSessionMemory,
+  pruneChatMessages,
+  runMemoryFlush,
+  summarizeForCompaction
+} from "./context-manager.js";
 
 // Helper function to save attachment to disk
 function saveAttachmentToDisk(attachment: Attachment, cwd: string): string | null {
@@ -285,6 +295,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       let modelName: string;
       let temperature: number | undefined;
       let providerInfo = '';
+      let modelContextLength: number | undefined;
       
       if (isLLMProviderModel && session.model) {
         // Extract provider ID and model ID
@@ -320,6 +331,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         modelName = modelId;
         temperature = session.temperature; // undefined means don't send
         providerInfo = `${provider.name} (${provider.type})`;
+        modelContextLength = llmSettings?.models?.find(m => m.id === modelId && m.providerId === providerId)?.contextLength;
       } else {
         // Use legacy API settings
         const guiSettings = loadApiSettings();
@@ -337,12 +349,17 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         modelName = guiSettings.model;
         temperature = session.temperature; // undefined means don't send
         providerInfo = 'Legacy API';
+        modelContextLength = undefined;
       }
       
       // Load legacy settings for other configuration (tools, permissions, etc)
       const guiSettings = loadApiSettings();
       // Tools that call OpenAI-compatible APIs should use the *current* provider credentials/baseURL.
       const toolApiSettings = { ...(guiSettings || {}), apiKey, baseUrl: baseURL };
+      const contextConfig = {
+        ...DEFAULT_CONTEXT_CONFIG,
+        contextWindowTokens: modelContextLength || DEFAULT_CONTEXT_CONFIG.contextWindowTokens
+      };
 
       // Custom fetch to capture error response bodies
       const originalFetch = global.fetch;
@@ -553,156 +570,229 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       if (todosSummary) {
         systemContent += todosSummary;
       }
-      
-      const messages: ChatMessage[] = [
-        {
-          role: 'system',
-          content: systemContent
-        }
-      ];
+      const sessionMemory = loadSessionMemory(
+        session.cwd && session.cwd !== 'No workspace folder' ? session.cwd : undefined
+      );
+      if (sessionMemory.trim()) {
+        systemContent += `\n\nSESSION MEMORY:\n${sessionMemory}\n\n---\n`;
+      }
 
-      // Load previous messages from session history
       const sessionStore = (global as any).sessionStore;
       let lastUserPrompt = '';
       let lastUserPromptHadAttachments = false;
       let isFirstUserPrompt = true;
-      
+
+      const buildMessagesFromHistory = async (historyMessages: any[]) => {
+        const builtMessages: ChatMessage[] = [
+          {
+            role: 'system',
+            content: systemContent
+          }
+        ];
+
+        let currentAssistantText = '';
+        let currentToolCalls: any[] = [];
+        let pendingToolResults: Map<string, { output: string; isError: boolean }> = new Map();
+
+        for (const msg of historyMessages) {
+          if (msg.type === 'system_summary') {
+            if (currentAssistantText.trim() || currentToolCalls.length > 0) {
+              const assistantMsg: ChatMessage = {
+                role: 'assistant',
+                content: currentAssistantText.trim() || ''
+              };
+              if (currentToolCalls.length > 0) {
+                assistantMsg.tool_calls = currentToolCalls;
+              }
+              builtMessages.push(assistantMsg);
+              for (const tc of currentToolCalls) {
+                const result = pendingToolResults.get(tc.id);
+                if (result) {
+                  builtMessages.push({
+                    role: 'tool',
+                    tool_call_id: tc.id,
+                    name: tc.function.name,
+                    content: result.isError ? `Error: ${result.output}` : result.output
+                  });
+                }
+              }
+              currentAssistantText = '';
+              currentToolCalls = [];
+              pendingToolResults.clear();
+            }
+
+            builtMessages.push({
+              role: 'system',
+              content: `[System Summary]\n${(msg as any).summary || ''}`.trim()
+            });
+            continue;
+          }
+
+          if (msg.type === 'user_prompt') {
+            const promptText = (msg as any).prompt || '';
+            const promptAttachments = (msg as any).attachments as Attachment[] | undefined;
+            const hasPromptAttachments = Array.isArray(promptAttachments) && promptAttachments.length > 0;
+
+            if (currentAssistantText.trim() || currentToolCalls.length > 0) {
+              const assistantMsg: ChatMessage = {
+                role: 'assistant',
+                content: currentAssistantText.trim() || ''
+              };
+              if (currentToolCalls.length > 0) {
+                assistantMsg.tool_calls = currentToolCalls;
+              }
+              builtMessages.push(assistantMsg);
+
+              for (const tc of currentToolCalls) {
+                const result = pendingToolResults.get(tc.id);
+                if (result) {
+                  builtMessages.push({
+                    role: 'tool',
+                    tool_call_id: tc.id,
+                    name: tc.function.name,
+                    content: result.isError ? `Error: ${result.output}` : result.output
+                  });
+                }
+              }
+
+              currentAssistantText = '';
+              currentToolCalls = [];
+              pendingToolResults.clear();
+            }
+
+            lastUserPrompt = promptText;
+            lastUserPromptHadAttachments = hasPromptAttachments;
+
+            const userContent = await buildUserContent(
+              promptText,
+              isFirstUserPrompt,
+              (msg as any).attachments
+            );
+            isFirstUserPrompt = false;
+            builtMessages.push({
+              role: 'user',
+              content: userContent
+            });
+          } else if (msg.type === 'text') {
+            currentAssistantText += (msg as any).text || '';
+          } else if (msg.type === 'tool_use') {
+            const toolId = (msg as any).id || `call_${Date.now()}_${currentToolCalls.length}`;
+            const toolName = (msg as any).name || 'unknown';
+            const toolInput = (msg as any).input || {};
+
+            currentToolCalls.push({
+              id: toolId,
+              type: 'function',
+              function: {
+                name: toolName,
+                arguments: JSON.stringify(toolInput)
+              }
+            });
+          } else if (msg.type === 'tool_result') {
+            const toolUseId = (msg as any).tool_use_id;
+            const output = (msg as any).output || '';
+            const isError = (msg as any).is_error || false;
+
+            if (toolUseId) {
+              pendingToolResults.set(toolUseId, { output, isError });
+            }
+          }
+        }
+
+        if (currentAssistantText.trim() || currentToolCalls.length > 0) {
+          const assistantMsg: ChatMessage = {
+            role: 'assistant',
+            content: currentAssistantText.trim() || ''
+          };
+          if (currentToolCalls.length > 0) {
+            assistantMsg.tool_calls = currentToolCalls;
+          }
+          builtMessages.push(assistantMsg);
+
+          for (const tc of currentToolCalls) {
+            const result = pendingToolResults.get(tc.id);
+            if (result) {
+              builtMessages.push({
+                role: 'tool',
+                tool_call_id: tc.id,
+                name: tc.function.name,
+                content: result.isError ? `Error: ${result.output}` : result.output
+              });
+            }
+          }
+        }
+
+        return builtMessages;
+      };
+
+      let historyMessages: any[] = [];
       if (sessionStore && session.id) {
         const history = sessionStore.getSessionHistory(session.id);
+        historyMessages = history?.messages || [];
 
-        // Clear todos from previous session for this sessionId, then load from history
         clearTodos(session.id);
         if (history && history.todos && history.todos.length > 0) {
           setTodos(session.id, history.todos);
         }
-        
-        if (history && history.messages.length > 0) {
-          
-          let currentAssistantText = '';
-          let currentToolCalls: any[] = [];
-          let pendingToolResults: Map<string, { output: string; isError: boolean }> = new Map();
-          
-          // Convert session history to OpenAI format (proper tool call format)
-          for (const msg of history.messages) {
-            if (msg.type === 'user_prompt') {
-              const promptText = (msg as any).prompt || '';
-              const promptAttachments = (msg as any).attachments as Attachment[] | undefined;
-              const hasPromptAttachments = Array.isArray(promptAttachments) && promptAttachments.length > 0;
-              
-              // Flush any pending assistant message with tool calls
-              if (currentAssistantText.trim() || currentToolCalls.length > 0) {
-                // Add assistant message (with or without tool calls)
-                const assistantMsg: ChatMessage = {
-                  role: 'assistant',
-                  content: currentAssistantText.trim() || ''
-                };
-                if (currentToolCalls.length > 0) {
-                  assistantMsg.tool_calls = currentToolCalls;
-                }
-                messages.push(assistantMsg);
-                
-                // Add tool results as separate messages (OpenAI format)
-                for (const tc of currentToolCalls) {
-                  const result = pendingToolResults.get(tc.id);
-                  if (result) {
-                    messages.push({
-                      role: 'tool',
-                      tool_call_id: tc.id,
-                      name: tc.function.name,
-                      content: result.isError ? `Error: ${result.output}` : result.output
-                    });
-                  }
-                }
-                
-                currentAssistantText = '';
-                currentToolCalls = [];
-                pendingToolResults.clear();
-              }
-              
-              // Track last user prompt to avoid duplication
-              lastUserPrompt = promptText;
-              lastUserPromptHadAttachments = hasPromptAttachments;
-              
-              // ALWAYS format user prompts with date (even from history)
-              const userContent = await buildUserContent(
-                promptText,
-                isFirstUserPrompt,
-                (msg as any).attachments
-              );
-              isFirstUserPrompt = false;
-              messages.push({
-                role: 'user',
-                content: userContent
-              });
-            } else if (msg.type === 'text') {
-              // Accumulate text into assistant message
-              currentAssistantText += (msg as any).text || '';
-            } else if (msg.type === 'tool_use') {
-              // Add tool call in OpenAI format
-              const toolId = (msg as any).id || `call_${Date.now()}_${currentToolCalls.length}`;
-              const toolName = (msg as any).name || 'unknown';
-              const toolInput = (msg as any).input || {};
-              
-              currentToolCalls.push({
-                id: toolId,
-                type: 'function',
-                function: {
-                  name: toolName,
-                  arguments: JSON.stringify(toolInput)
-                }
-              });
-            } else if (msg.type === 'tool_result') {
-              // Store tool result for pairing with tool call
-              const toolUseId = (msg as any).tool_use_id;
-              const output = (msg as any).output || '';
-              const isError = (msg as any).is_error || false;
-              
-              if (toolUseId) {
-                pendingToolResults.set(toolUseId, { output, isError });
-              }
-            }
-            // Skip other message types (system, etc.)
-          }
-          
-          // Flush final assistant message if any
-          if (currentAssistantText.trim() || currentToolCalls.length > 0) {
-            const assistantMsg: ChatMessage = {
-              role: 'assistant',
-              content: currentAssistantText.trim() || ''
-            };
-            if (currentToolCalls.length > 0) {
-              assistantMsg.tool_calls = currentToolCalls;
-            }
-            messages.push(assistantMsg);
-            
-            // Add tool results
-            for (const tc of currentToolCalls) {
-              const result = pendingToolResults.get(tc.id);
-              if (result) {
-                messages.push({
-                  role: 'tool',
-                  tool_call_id: tc.id,
-                  name: tc.function.name,
-                  content: result.isError ? `Error: ${result.output}` : result.output
-                });
-              }
-            }
-          }
+      }
+
+      let messages = await buildMessagesFromHistory(historyMessages);
+
+      const addCurrentPromptIfNeeded = async () => {
+        const currentHasAttachments = Array.isArray(attachments) && attachments.length > 0;
+        if (prompt !== lastUserPrompt || (currentHasAttachments && !lastUserPromptHadAttachments)) {
+          const shouldAddMemory = messages.length === 1;
+          const userContent = await buildUserContent(prompt, shouldAddMemory, attachments);
+          messages.push({
+            role: 'user',
+            content: userContent
+          });
+        }
+      };
+
+      await addCurrentPromptIfNeeded();
+
+      const estimatedTokens = estimateTokensForChatMessages(messages);
+      const usageRatio = getUsageRatio(estimatedTokens, contextConfig);
+
+      if (sessionStore && session.id && usageRatio >= contextConfig.memoryFlushRatio) {
+        try {
+          await runMemoryFlush({
+            client,
+            model: modelName,
+            messages: historyMessages as any,
+            sessionCwd: session.cwd && session.cwd !== 'No workspace folder' ? session.cwd : undefined,
+            config: contextConfig
+          });
+        } catch (error) {
+          console.warn('[OpenAI Runner] Memory flush failed:', error);
         }
       }
 
-      // Add current prompt ONLY if it's different from the last one in history
-      // (or if attachments exist but the last stored prompt didn't include them)
-      const currentHasAttachments = Array.isArray(attachments) && attachments.length > 0;
-      if (prompt !== lastUserPrompt || (currentHasAttachments && !lastUserPromptHadAttachments)) {
-        // Always format prompt with current date for context
-        // Add memory only if this is a new session (no history)
-        const shouldAddMemory = messages.length === 1; // Only system message exists
-        const userContent = await buildUserContent(prompt, shouldAddMemory, attachments);
-        messages.push({
-          role: 'user',
-          content: userContent
-        });
+      if (sessionStore && session.id && usageRatio >= contextConfig.compactionRatio) {
+        try {
+          const cutoffIndex = getCompactionCutoffIndex(historyMessages as any, contextConfig.keepLastTurns);
+          if (cutoffIndex >= 0) {
+            const summaryText = await summarizeForCompaction({
+              client,
+              model: modelName,
+              messages: historyMessages.slice(0, cutoffIndex + 1) as any,
+              config: contextConfig
+            });
+            if (summaryText) {
+              sessionStore.replaceMessagesBeforeIndexWithSummary(session.id, cutoffIndex, summaryText);
+              const updatedHistory = sessionStore.getSessionHistory(session.id);
+              historyMessages = updatedHistory?.messages || historyMessages;
+              lastUserPrompt = '';
+              lastUserPromptHadAttachments = false;
+              isFirstUserPrompt = true;
+              messages = await buildMessagesFromHistory(historyMessages);
+              await addCurrentPromptIfNeeded();
+            }
+          }
+        } catch (error) {
+          console.warn('[OpenAI Runner] Compaction failed:', error);
+        }
       }
 
       // Track total usage across all iterations
@@ -775,6 +865,12 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         if (updatedTodosSummary) {
           updatedSystemContent += updatedTodosSummary;
         }
+        const updatedSessionMemory = loadSessionMemory(
+          session.cwd && session.cwd !== 'No workspace folder' ? session.cwd : undefined
+        );
+        if (updatedSessionMemory.trim()) {
+          updatedSystemContent += `\n\nSESSION MEMORY:\n${updatedSessionMemory}\n\n---\n`;
+        }
         messages[0] = { role: 'system', content: updatedSystemContent };
         
         const iterationStartTime = Date.now();
@@ -798,10 +894,12 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
             m.content.some((c: any) => c.type === 'image_url'))
         });
 
+        const requestMessages = pruneChatMessages(messages, contextConfig);
+
         // Log request to file
         const requestPayload = {
           model: modelName,
-          messages: redactMessagesForLog(messages),
+          messages: redactMessagesForLog(requestMessages),
           tools: activeTools,
           temperature,
           timestamp: new Date().toISOString()
@@ -820,7 +918,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
             try {
               const stream = await client.chat.completions.create({
                 model: modelName,
-                messages: messages as any[],
+                messages: requestMessages as any[],
                 tools: activeTools as any[],
                 stream: true,
                 parallel_tool_calls: true,
