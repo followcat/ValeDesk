@@ -879,12 +879,19 @@ fn get_file_old_content(params: GetFileContentParams) -> Result<String, String> 
 
 #[tauri::command]
 fn get_file_content_at_commit(params: GetFileContentAtCommitParams) -> Result<String, String> {
-  let is_valid_commit = params.commit.len() >= 7
-    && params.commit.len() <= 64
-    && params
-      .commit
-      .chars()
-      .all(|c| c.is_ascii_hexdigit());
+  let mut split_idx = 0usize;
+  for (idx, c) in params.commit.char_indices() {
+    if c.is_ascii_hexdigit() {
+      split_idx = idx + c.len_utf8();
+    } else {
+      break;
+    }
+  }
+  let (hex_part, suffix) = params.commit.split_at(split_idx);
+  let is_valid_commit = hex_part.len() >= 7
+    && hex_part.len() <= 64
+    && hex_part.chars().all(|c| c.is_ascii_hexdigit())
+    && suffix.chars().all(|c| c == '^' || c == '~' || c.is_ascii_digit());
 
   if !is_valid_commit {
     return Ok(String::new());

@@ -362,26 +362,19 @@ function emit(event: ServerEvent) {
   }
   if (event.type === "stream.message") {
     const message = event.payload.message as any;
-    // Check if this is an update event (for tool_use with diffSnapshot)
-    // Don't record update events as new messages - they update existing ones
-    if (message._update && message._updateToolUseId) {
-      console.log(`[IPC] Received update event for tool_use:`, message._updateToolUseId);
-      // Skip recording - this is an update, not a new message
-    } else {
-      // Check if this is a result message with token usage
-      if (message.type === "result" && message.usage) {
-        const { input_tokens, output_tokens } = message.usage;
-        if (input_tokens !== undefined || output_tokens !== undefined) {
-          sessions.updateTokens(
-            event.payload.sessionId,
-            input_tokens || 0,
-            output_tokens || 0
-          );
-        }
+    // Check if this is a result message with token usage
+    if (message.type === "result" && message.usage) {
+      const { input_tokens, output_tokens } = message.usage;
+      if (input_tokens !== undefined || output_tokens !== undefined) {
+        sessions.updateTokens(
+          event.payload.sessionId,
+          input_tokens || 0,
+          output_tokens || 0
+        );
       }
-      if (!isStreamEventMessage) {
-        sessions.recordMessage(event.payload.sessionId, event.payload.message);
-      }
+    }
+    if (!isStreamEventMessage) {
+      sessions.recordMessage(event.payload.sessionId, event.payload.message);
     }
   }
   if (event.type === "stream.user_prompt") {

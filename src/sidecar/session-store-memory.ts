@@ -318,9 +318,8 @@ export class MemorySessionStore {
           messages[i] = updatedMessage as StreamMessage;
           this.messages.set(sessionId, messages);
           
-          console.log(`[MemorySessionStore] ✓ Updated tool_use message ${uuid} with diffSnapshot:`, {
-            newInputKeys: Object.keys(updatedMessage.input),
-            hasDiffSnapshot: !!updatedMessage.input.diffSnapshot
+          console.log(`[MemorySessionStore] ✓ Updated tool_use message ${uuid}:`, {
+            newInputKeys: Object.keys(updatedMessage.input)
           });
           
           // Sync updated message to Rust DB

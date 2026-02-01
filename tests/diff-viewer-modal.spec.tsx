@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { DiffViewerModal } from "../src/ui/components/DiffViewerModal";
 import type { ChangedFile } from "../src/ui/components/ChangedFiles";
+import { useAppStore } from "../src/ui/store/useAppStore";
 
 // Создаем мок для invoke функции
 const mockInvoke = vi.fn();
@@ -34,11 +35,13 @@ describe("DiffViewerModal", () => {
 
   beforeEach(() => {
     mockInvoke.mockClear();
+    useAppStore.setState({ apiSettings: { enableSessionGitRepo: true } as any });
     // Мокаем scrollTo для элементов, так как jsdom не поддерживает его
     Element.prototype.scrollTo = vi.fn();
   });
 
   afterEach(() => {
+    useAppStore.setState({ apiSettings: null });
     vi.clearAllMocks();
   });
 
