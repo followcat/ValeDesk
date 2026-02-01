@@ -13,6 +13,8 @@ import { PromptInput, usePromptActions } from "./components/PromptInput";
 import { MessageCard } from "./components/EventCard";
 import { AppFooter } from "./components/AppFooter";
 import { TodoPanel } from "./components/TodoPanel";
+import { CharterPanel } from "./components/CharterPanel";
+import { ADRPanel } from "./components/ADRPanel";
 import MDContent from "./render/markdown";
 import { getPlatform } from "./platform";
 import { basenameFsPath } from "./platform/fs-path";
@@ -565,6 +567,8 @@ function App() {
               onConfirmChanges={handleConfirmChanges}
               onRollbackChanges={handleRollbackChanges}
             />
+            <CharterPanel charter={activeSession.charter} />
+            <ADRPanel adrs={activeSession.adrs} />
           </div>
         )}
 
