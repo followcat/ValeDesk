@@ -49,6 +49,9 @@ jobs:
       - name: install project dependencies
         run: npm install
 
+      - name: install pkg globally
+        run: npm install -g @yao-pkg/pkg
+
       - name: Build Sidecar (Unix)
         if: matrix.os != 'windows-latest'
         run: |
