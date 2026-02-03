@@ -65,11 +65,14 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
     if (activeSessionId && !trimmedPrompt && !hasAttachments) return;
 
     if (!activeSessionId) {
-      // Resolve selected model id to API model name (for scheduler default and session.start)
+      // Resolve selected model to API model name for legacy models (provider IDs keep :: form)
       const state = useAppStore.getState();
       const apiModelName = state.llmModels?.find(m => m.id === selectedModel)?.name
         ?? state.availableModels?.find(m => m.id === selectedModel)?.name
         ?? selectedModel;
+      const isProviderModel = Boolean(selectedModel && selectedModel.includes("::"));
+      const sessionModel = isProviderModel ? selectedModel : (apiModelName || selectedModel);
+      const defaultModelId = isProviderModel ? selectedModel : apiModelName;
 
       setPendingStart(true);
       
@@ -85,17 +88,17 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
           prompt: trimmedPrompt, // Can be empty string
           cwd: cwd.trim() || undefined,
           allowedTools: DEFAULT_ALLOWED_TOOLS,
-          model: apiModelName || selectedModel || undefined,
+          model: sessionModel || undefined,
           temperature: sendTemperature ? selectedTemperature : undefined,
           enableSessionGitRepo: options?.enableSessionGitRepo ?? apiSettings?.enableSessionGitRepo ?? false,
           attachments: hasAttachments ? attachments : undefined
         }
       });
-      // Save API model name as default for future sessions (API expects name, not internal id)
-      if (selectedModel) {
+      // Save model id for future sessions (provider IDs keep :: form)
+      if (defaultModelId) {
         sendEvent({
           type: "scheduler.default_model.set",
-          payload: { modelId: apiModelName }
+          payload: { modelId: defaultModelId }
         } as ClientEvent);
       }
       // Save temperature as default for future sessions
