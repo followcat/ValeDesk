@@ -190,37 +190,36 @@ impl Database {
     pub fn list_sessions(&self) -> SqliteResult<Vec<Session>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            r#"SELECT id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, 
+            r#"SELECT id, title, status, cwd, allowed_tools, last_prompt, 
                       model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, created_at, updated_at,
                       charter, charter_hash, adrs
                FROM sessions ORDER BY updated_at DESC"#
         )?;
 
         let rows = stmt.query_map([], |row| {
-            let charter_str: Option<String> = row.get(16)?;
+            let charter_str: Option<String> = row.get(15)?;
             let charter = charter_str.and_then(|s| serde_json::from_str(&s).ok());
-            let adrs_str: Option<String> = row.get(18)?;
+            let adrs_str: Option<String> = row.get(17)?;
             let adrs = adrs_str.and_then(|s| serde_json::from_str(&s).ok());
             
             Ok(Session {
                 id: row.get(0)?,
                 title: row.get(1)?,
-                claude_session_id: row.get(2)?,
-                status: row.get(3)?,
-                cwd: row.get(4)?,
-                allowed_tools: row.get(5)?,
-                last_prompt: row.get(6)?,
-                model: row.get(7)?,
-                thread_id: row.get(8)?,
-                temperature: row.get(9)?,
-                enable_session_git_repo: row.get(10)?,
-                is_pinned: row.get::<_, i32>(11)? != 0,
-                input_tokens: row.get(12)?,
-                output_tokens: row.get(13)?,
-                created_at: row.get(14)?,
-                updated_at: row.get(15)?,
+                status: row.get(2)?,
+                cwd: row.get(3)?,
+                allowed_tools: row.get(4)?,
+                last_prompt: row.get(5)?,
+                model: row.get(6)?,
+                thread_id: row.get(7)?,
+                temperature: row.get(8)?,
+                enable_session_git_repo: row.get(9)?,
+                is_pinned: row.get::<_, i32>(10)? != 0,
+                input_tokens: row.get(11)?,
+                output_tokens: row.get(12)?,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
                 charter,
-                charter_hash: row.get(17)?,
+                charter_hash: row.get(16)?,
                 adrs,
             })
         })?;
@@ -231,37 +230,36 @@ impl Database {
     pub fn get_session(&self, id: &str) -> SqliteResult<Option<Session>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            r#"SELECT id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, 
+            r#"SELECT id, title, status, cwd, allowed_tools, last_prompt, 
                       model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, created_at, updated_at,
                       charter, charter_hash, adrs
                FROM sessions WHERE id = ?1"#
         )?;
 
         let mut rows = stmt.query_map([id], |row| {
-            let charter_str: Option<String> = row.get(16)?;
+            let charter_str: Option<String> = row.get(15)?;
             let charter = charter_str.and_then(|s| serde_json::from_str(&s).ok());
-            let adrs_str: Option<String> = row.get(18)?;
+            let adrs_str: Option<String> = row.get(17)?;
             let adrs = adrs_str.and_then(|s| serde_json::from_str(&s).ok());
             
             Ok(Session {
                 id: row.get(0)?,
                 title: row.get(1)?,
-                claude_session_id: row.get(2)?,
-                status: row.get(3)?,
-                cwd: row.get(4)?,
-                allowed_tools: row.get(5)?,
-                last_prompt: row.get(6)?,
-                model: row.get(7)?,
-                thread_id: row.get(8)?,
-                temperature: row.get(9)?,
-                enable_session_git_repo: row.get(10)?,
-                is_pinned: row.get::<_, i32>(11)? != 0,
-                input_tokens: row.get(12)?,
-                output_tokens: row.get(13)?,
-                created_at: row.get(14)?,
-                updated_at: row.get(15)?,
+                status: row.get(2)?,
+                cwd: row.get(3)?,
+                allowed_tools: row.get(4)?,
+                last_prompt: row.get(5)?,
+                model: row.get(6)?,
+                thread_id: row.get(7)?,
+                temperature: row.get(8)?,
+                enable_session_git_repo: row.get(9)?,
+                is_pinned: row.get::<_, i32>(10)? != 0,
+                input_tokens: row.get(11)?,
+                output_tokens: row.get(12)?,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
                 charter,
-                charter_hash: row.get(17)?,
+                charter_hash: row.get(16)?,
                 adrs,
             })
         })?;
