@@ -12,8 +12,7 @@ import type { SidecarInboundMessage, SidecarOutboundMessage } from "./protocol.j
 // Use in-memory session store - no SQLite/better-sqlite3 dependency
 import { MemorySessionStore, type Session } from "./session-store-memory.js";
 
-import { runClaude as runClaudeSDK } from "../agent/libs/runner.js";
-import { runClaude as runOpenAI } from "../agent/libs/runner-openai.js";
+import { runOpenAI } from "../agent/libs/runner-openai.js";
 import { loadApiSettings, saveApiSettings } from "../agent/libs/settings-store.js";
 import { loadLLMProviderSettings, saveLLMProviderSettings } from "../agent/libs/llm-providers-store.js";
 import { fetchModelsFromProvider, checkModelsAvailability } from "../agent/libs/llm-providers.js";
@@ -57,10 +56,7 @@ sessions.setSyncCallback((type, sessionId, data) => {
 const runnerHandles = new Map<string, RunnerHandle>();
 const multiThreadTasks = new Map<string, any>();
 
-function selectRunner(model: string | undefined) {
-  if (model?.startsWith("claude-code::")) {
-    return runClaudeSDK;
-  }
+function selectRunner(_model: string | undefined) {
   return runOpenAI;
 }
 
@@ -445,11 +441,10 @@ Format your response clearly with sections.`;
     payload: { sessionId: summarySession.id, threadId: "summary", prompt: summaryPrompt },
   } as any);
 
-  const runClaude = selectRunner(session.model);
-  const handle = await runClaude({
+  const runRunner = selectRunner(session.model);
+  const handle = await runRunner({
     prompt: summaryPrompt,
     session,
-    resumeSessionId: undefined,
     onEvent: emitAndPersist,
     onSessionUpdate: (updates: any) => {
       sessions.updateSession(summarySession.id, updates);
@@ -553,11 +548,10 @@ function startRunner(sessionId: string, prompt: string, attachments?: Attachment
   }
 
   // Fire and forget: runner emits events via emitAndPersist
-  const runClaude = selectRunner(session.model);
-  void runClaude({
+  const runRunner = selectRunner(session.model);
+  void runRunner({
     prompt,
     session,
-    resumeSessionId: session.claudeSessionId,
     onEvent: emitAndPersist,
     onSessionUpdate: (updates) => sessions.updateSession(session.id, updates),
     attachments,
@@ -637,10 +631,10 @@ function handleSessionStart(event: Extract<ClientEvent, { type: "session.start" 
   session = sessions.getSession(session.id)!;
   emitSessionStatus(session, "running");
 
-  if (session.title === "New Chat" && event.payload.prompt) {
+  if (session.title === DEFAULT_SESSION_TITLE && event.payload.prompt) {
     generateSessionTitle(event.payload.prompt, session.model)
       .then((newTitle) => {
-        if (newTitle && newTitle !== "New Chat") {
+        if (newTitle && newTitle !== DEFAULT_SESSION_TITLE) {
           sessions.updateSession(session.id, { title: newTitle });
           const updatedSession = sessions.getSession(session.id);
           if (updatedSession) {
@@ -698,10 +692,10 @@ function handleSessionContinue(event: Extract<ClientEvent, { type: "session.cont
     payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd, model: session.model, temperature: session.temperature },
   } as any);
 
-  if (session.title === "New Chat" && prompt) {
+  if (session.title === DEFAULT_SESSION_TITLE && prompt) {
     generateSessionTitle(prompt, session.model)
       .then((newTitle) => {
-        if (newTitle && newTitle !== "New Chat") {
+        if (newTitle && newTitle !== DEFAULT_SESSION_TITLE) {
           sessions.updateSession(session.id, { title: newTitle });
           emit({
             type: "session.status",
@@ -866,11 +860,10 @@ function handleMessageEdit(event: Extract<ClientEvent, { type: "message.edit" }>
     payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd, model: session.model, temperature: session.temperature },
   } as any);
 
-  const runClaude = selectRunner(session.model);
-  void runClaude({
+  const runRunner = selectRunner(session.model);
+  void runRunner({
     prompt: newPrompt,
     session,
-    resumeSessionId: session.claudeSessionId,
     onEvent: emitAndPersist,
     onSessionUpdate: (updates: any) => sessions.updateSession(session.id, updates),
   } as any)
@@ -997,11 +990,10 @@ function startThread(threadId: string, prompt: string) {
   } as any);
   emitAndPersist({ type: "stream.user_prompt", payload: { sessionId: threadId, threadId, prompt } } as any);
 
-  const runClaude = selectRunner(thread.model);
-  void runClaude({
+  const runRunner = selectRunner(thread.model);
+  void runRunner({
     prompt,
     session: thread,
-    resumeSessionId: thread.claudeSessionId,
     onEvent: emitAndPersist,
     onSessionUpdate: (updates: any) => sessions.updateSession(threadId, updates),
   } as any)

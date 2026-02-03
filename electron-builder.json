@@ -9,7 +9,6 @@
         "dist-electron/preload.cjs"
     ],
     "asarUnpack": [
-        "node_modules/@anthropic-ai/claude-agent-sdk/**/*",
         "node_modules/pdf-parse/**/*",
         "node_modules/mammoth/**/*",
         "node_modules/quickjs-emscripten/**/*"

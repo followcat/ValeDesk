@@ -1,14 +1,15 @@
-import type { SDKMessage, PermissionResult } from "@anthropic-ai/claude-agent-sdk";
+export type PermissionResult = {
+  behavior: "allow" | "deny";
+  updatedInput?: unknown;
+  message?: string;
+};
 
-export type ClaudeSettingsEnv = {
-  ANTHROPIC_AUTH_TOKEN: string;
-  ANTHROPIC_BASE_URL: string;
-  ANTHROPIC_DEFAULT_HAIKU_MODEL: string;
-  ANTHROPIC_DEFAULT_OPUS_MODEL: string;
-  ANTHROPIC_DEFAULT_SONNET_MODEL: string;
-  ANTHROPIC_MODEL: string;
-  API_TIMEOUT_MS: string;
-  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: string;
+export type SDKMessage = {
+  type: string;
+  message?: any;
+  subtype?: string;
+  usage?: { input_tokens?: number; output_tokens?: number };
+  [key: string]: unknown;
 };
 
 export type WebSearchProvider = 'tavily' | 'zai';
@@ -37,8 +38,8 @@ export type ApiSettings = {
   enableDuckDuckGo?: boolean; // Enable search/search_news/search_images (no API key needed)
   enableFetchTools?: boolean; // Enable fetch/fetch_json/download tools
   enableImageTools?: boolean; // Enable attach_image tool
-  useGitForDiff?: boolean; // Use git for diff (true) or file snapshots (false)
   llmProviders?: LLMProviderSettings; // LLM providers and models configuration
+  language?: 'auto' | 'en' | 'zh-CN'; // UI language preference
 
   // If set, new sessions created without a workspace folder will use:
   //   {conversationDataDir}/{sessionId}
@@ -58,7 +59,7 @@ export type ModelInfo = {
 };
 
 // LLM Provider types
-export type LLMProviderType = 'openai' | 'openrouter' | 'zai' | 'claude-code';
+export type LLMProviderType = 'openai' | 'openrouter' | 'zai';
 
 export type ZaiApiUrlPrefix = 'default' | 'coding';
 
@@ -119,7 +120,6 @@ export type SessionInfo = {
   id: string;
   title: string;
   status: SessionStatus;
-  claudeSessionId?: string;
   cwd?: string;
   isPinned?: boolean;
   createdAt: number;

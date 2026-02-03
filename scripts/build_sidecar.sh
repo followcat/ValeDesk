@@ -68,3 +68,8 @@ echo "Building binary with pkg..."
 pkg dist-sidecar/bundled.js --target "$PKG_TARGET" --output "$BIN_PATH" || exit 1
 
 echo "Sidecar binary built successfully: $BIN_PATH"
+
+# Ensure canonical binary name for Tauri bundling
+CANONICAL_BIN="${BIN_DIR}/valera-sidecar"
+cp "$BIN_PATH" "$CANONICAL_BIN"
+echo "Copied sidecar binary to: $CANONICAL_BIN"

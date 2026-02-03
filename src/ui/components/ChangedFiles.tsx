@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export interface ChangedFile {
   file_path: string;
@@ -17,6 +18,7 @@ export interface ChangedFilesProps {
 }
 
 export function ChangedFiles({ files, onApply, onReject, onViewDiff }: ChangedFilesProps) {
+  const { t } = useTranslation();
   const [showAll, setShowAll] = useState(false);
 
   if (!files || files.length === 0) {
@@ -34,7 +36,7 @@ export function ChangedFiles({ files, onApply, onReject, onViewDiff }: ChangedFi
       <div className="px-4 py-3 border-b border-ink-900/5 bg-surface-tertiary">
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium text-ink-800">
-            Changed files: {files.length}
+            {t("changedFiles.title", { count: files.length })}
           </h4>
         </div>
       </div>
@@ -80,7 +82,7 @@ export function ChangedFiles({ files, onApply, onReject, onViewDiff }: ChangedFi
                 onClick={() => onViewDiff(file)}
                 className="shrink-0 text-xs font-medium text-accent hover:text-accent/80 px-3 py-1.5 rounded-lg border border-accent/20 hover:border-accent/40 bg-accent/5 hover:bg-accent/10 transition-colors"
               >
-                View diff
+                {t("changedFiles.viewDiff")}
               </button>
             )}
           </div>
@@ -98,14 +100,14 @@ export function ChangedFiles({ files, onApply, onReject, onViewDiff }: ChangedFi
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="18 15 12 9 6 15" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Show less
+              {t("changedFiles.showLess")}
             </>
           ) : (
             <>
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="6 9 12 15 18 9" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Show all {files.length} files
+              {t("changedFiles.showAll", { count: files.length })}
             </>
           )}
         </button>
@@ -121,7 +123,7 @@ export function ChangedFiles({ files, onApply, onReject, onViewDiff }: ChangedFi
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Apply Changes
+            {t("changedFiles.applyChanges")}
           </button>
         )}
         {onReject && (
@@ -133,7 +135,7 @@ export function ChangedFiles({ files, onApply, onReject, onViewDiff }: ChangedFi
               <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round" strokeLinejoin="round"/>
               <line x1="6" y1="6" x2="18" y2="18" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Reject
+            {t("common.reject")}
           </button>
         )}
       </div>

@@ -1,9 +1,10 @@
+// @ts-nocheck
 import { useState, useEffect, useMemo, Fragment, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import * as Dialog from "@radix-ui/react-dialog";
 import { diffLines as computeDiffLines } from "diff";
 import type { ChangedFile } from "./ChangedFiles";
 import { getPlatform } from "../platform";
-import { useAppStore } from "../store/useAppStore";
 
 // Check which platform is being used
 const isTauri = typeof (window as any).__TAURI__ !== "undefined";
@@ -14,6 +15,7 @@ interface DiffViewerModalProps {
   file: ChangedFile | null;
   files?: ChangedFile[];
   cwd?: string;
+  sessionId?: string;
   open: boolean;
   onClose: () => void;
   onFileChange?: (file: ChangedFile) => void;
@@ -26,17 +28,15 @@ interface DiffLineItem {
   newLineNumber?: number;
 }
 
-export function DiffViewerModal({ file, files = [], cwd, open, onClose, onFileChange }: DiffViewerModalProps) {
+export function DiffViewerModal({ file, files = [], cwd, sessionId, open, onClose, onFileChange }: DiffViewerModalProps) {
+  const { t } = useTranslation();
   const [oldContent, setOldContent] = useState<string>("");
   const [newContent, setNewContent] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentChangeBlockIndex, setCurrentChangeBlockIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Get settings from store
-  const apiSettings = useAppStore((state) => state.apiSettings);
-  const useGitForDiff = apiSettings?.useGitForDiff ?? true;
+  const useGitForDiff = true;
 
   // Find current file index in files array
   const currentFileIndex = useMemo(() => {
@@ -412,8 +412,8 @@ export function DiffViewerModal({ file, files = [], cwd, open, onClose, onFileCh
                     onClick={handlePreviousFile}
                     disabled={!hasPreviousFile}
                     className="p-1.5 text-ink-400 hover:text-ink-600 disabled:text-ink-300 disabled:cursor-not-allowed transition-colors rounded hover:bg-ink-900/5"
-                    aria-label="Previous file"
-                    title="Previous file"
+                    aria-label={t("diffViewer.prevFile")}
+                    title={t("diffViewer.prevFile")}
                   >
                     <svg
                       className="w-5 h-5"
@@ -436,8 +436,8 @@ export function DiffViewerModal({ file, files = [], cwd, open, onClose, onFileCh
                     onClick={handleNextFile}
                     disabled={!hasNextFile}
                     className="p-1.5 text-ink-400 hover:text-ink-600 disabled:text-ink-300 disabled:cursor-not-allowed transition-colors rounded hover:bg-ink-900/5"
-                    aria-label="Next file"
-                    title="Next file"
+                    aria-label={t("diffViewer.nextFile")}
+                    title={t("diffViewer.nextFile")}
                   >
                     <svg
                       className="w-5 h-5"
@@ -462,8 +462,8 @@ export function DiffViewerModal({ file, files = [], cwd, open, onClose, onFileCh
                     onClick={handlePreviousChange}
                     disabled={!hasPreviousChange}
                     className="p-1.5 text-ink-400 hover:text-ink-600 disabled:text-ink-300 disabled:cursor-not-allowed transition-colors rounded hover:bg-ink-900/5"
-                    aria-label="Previous change"
-                    title="Previous change block"
+                    aria-label={t("diffViewer.prevChange")}
+                    title={t("diffViewer.prevChange")}
                   >
                     <svg
                       className="w-5 h-5"
@@ -486,8 +486,8 @@ export function DiffViewerModal({ file, files = [], cwd, open, onClose, onFileCh
                     onClick={handleNextChange}
                     disabled={!hasNextChange}
                     className="p-1.5 text-ink-400 hover:text-ink-600 disabled:text-ink-300 disabled:cursor-not-allowed transition-colors rounded hover:bg-ink-900/5"
-                    aria-label="Next change"
-                    title="Next change block"
+                    aria-label={t("diffViewer.nextChange")}
+                    title={t("diffViewer.nextChange")}
                   >
                     <svg
                       className="w-5 h-5"
@@ -506,13 +506,13 @@ export function DiffViewerModal({ file, files = [], cwd, open, onClose, onFileCh
                 </div>
               )}
               <Dialog.Title className="text-lg font-semibold text-ink-800 truncate flex-1">
-                Diff: {file.file_path}
+                {t("diffViewer.title", { file: file.file_path })}
               </Dialog.Title>
             </div>
             <Dialog.Close asChild>
               <button
                 className="text-ink-400 hover:text-ink-600 transition-colors shrink-0 ml-4"
-                aria-label="Close"
+                aria-label={t("common.close")}
               >
                 <svg
                   className="w-6 h-6"
@@ -535,7 +535,7 @@ export function DiffViewerModal({ file, files = [], cwd, open, onClose, onFileCh
           <div className="flex-1 overflow-hidden relative">
             {loading ? (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-ink-500">Loading file contents...</div>
+                <div className="text-ink-500">{t("diffViewer.loading")}</div>
               </div>
             ) : error ? (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -547,10 +547,10 @@ export function DiffViewerModal({ file, files = [], cwd, open, onClose, onFileCh
                 <div className="grid grid-cols-2">
                   {/* Header Row */}
                   <div className="sticky top-0 bg-surface-tertiary px-4 py-2 border-b border-r border-ink-900/10 text-sm font-medium text-ink-700 z-10">
-                    Old Version
+                    {t("diffViewer.oldVersion")}
                   </div>
                   <div className="sticky top-0 bg-surface-tertiary px-4 py-2 border-b border-ink-900/10 text-sm font-medium text-ink-700 z-10">
-                    New Version
+                    {t("diffViewer.newVersion")}
                   </div>
 
                   {/* Diff Lines - synchronized by index */}

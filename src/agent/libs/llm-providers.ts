@@ -69,38 +69,6 @@ async function fetchOpenRouterModels(apiKey: string): Promise<PartialModel[]> {
   }
 }
 
-// Fetch models for Claude Code (subscription-based, no API key needed)
-async function fetchClaudeCodeModels(): Promise<PartialModel[]> {
-  // Claude Code subscription provides access to Claude models via the SDK
-  // These models are fixed and don't require an API call to fetch
-  return [
-    {
-      id: 'claude-sonnet-4-20250514',
-      name: 'Claude Sonnet 4',
-      description: 'Latest Claude Sonnet 4 model (via Claude Code subscription)',
-      contextLength: 200000,
-    },
-    {
-      id: 'claude-3-7-sonnet-20250219',
-      name: 'Claude 3.7 Sonnet',
-      description: 'Claude 3.7 Sonnet (via Claude Code subscription)',
-      contextLength: 200000,
-    },
-    {
-      id: 'claude-3-5-sonnet-20241022',
-      name: 'Claude 3.5 Sonnet',
-      description: 'Claude 3.5 Sonnet (via Claude Code subscription)',
-      contextLength: 200000,
-    },
-    {
-      id: 'claude-3-5-haiku-20241022',
-      name: 'Claude 3.5 Haiku',
-      description: 'Claude 3.5 Haiku - fast and efficient (via Claude Code subscription)',
-      contextLength: 200000,
-    },
-  ];
-}
-
 // Fetch models from Z.AI
 async function fetchZaiModels(apiKey: string, apiPrefix: 'default' | 'coding' = 'default'): Promise<PartialModel[]> {
   try {
@@ -149,10 +117,6 @@ export async function fetchModelsFromProvider(provider: LLMProvider): Promise<LL
 
     case 'zai':
       fetchedModels = await fetchZaiModels(provider.apiKey, provider.zaiApiPrefix || 'default');
-      break;
-
-    case 'claude-code':
-      fetchedModels = await fetchClaudeCodeModels();
       break;
 
     default:
@@ -229,11 +193,8 @@ export function validateProvider(provider: Partial<LLMProvider>): { valid: boole
     return { valid: false, error: 'Provider name is required' };
   }
 
-  // Claude Code doesn't need API key (uses subscription via CLI)
-  if (provider.type !== 'claude-code') {
-    if (!provider.apiKey || provider.apiKey.trim() === '') {
-      return { valid: false, error: 'API key is required' };
-    }
+  if (!provider.apiKey || provider.apiKey.trim() === '') {
+    return { valid: false, error: 'API key is required' };
   }
 
   if ((provider.type === 'openai' || provider.type === 'zai') && !provider.baseUrl) {

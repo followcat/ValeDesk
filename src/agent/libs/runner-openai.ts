@@ -1,6 +1,6 @@
 
 /**
- * OpenAI-based runner - replacement for Claude SDK
+ * OpenAI-based runner
  * Gives us full control over requests, tools, and streaming
  */
 
@@ -73,7 +73,6 @@ function saveAttachmentToDisk(attachment: Attachment, cwd: string): string | nul
 export type RunnerOptions = {
   prompt: string;
   session: Session;
-  resumeSessionId?: string;
   onEvent: (event: ServerEvent) => void;
   onSessionUpdate?: (updates: Partial<Session>) => void;
   attachments?: Attachment[];
@@ -145,7 +144,7 @@ const redactMessagesForLog = (messages: ChatMessage[]) => {
 };
 
 
-export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
+export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
   const { prompt, session, onEvent, onSessionUpdate, attachments } = options;
   // Initialize execution logger for this session
   executionLogger.setSession(session.id);
@@ -822,11 +821,6 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         permissionMode: currentGuiSettings?.permissionMode || 'ask',
         memoryEnabled: currentGuiSettings?.enableMemory || false
       });
-
-      // Update session with ID for resume support
-      if (onSessionUpdate) {
-        onSessionUpdate({ claudeSessionId: session.id });
-      }
 
       // Main agent loop
       iterationCount = 0;
@@ -1583,26 +1577,6 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
             hasError: !!result.error
           });
           
-          // Log result for write_file and edit_file tools
-          if (toolName === 'write_file' || toolName === 'edit_file') {
-            console.log(`[OpenAI Runner] ========== FILE TOOL RESULT ==========`);
-            console.log(`[OpenAI Runner] Tool ${toolName} executed:`, {
-              success: result.success,
-              hasData: !!result.data,
-              dataKeys: result.data ? Object.keys(result.data) : [],
-              hasDiffSnapshot: !!(result.data && (result.data as any).diffSnapshot),
-              error: result.error,
-              resultData: result.data
-            });
-            sendDebugLog(`File tool ${toolName} result`, {
-              success: result.success,
-              hasData: !!result.data,
-              dataKeys: result.data ? Object.keys(result.data) : [],
-              hasDiffSnapshot: !!(result.data && (result.data as any).diffSnapshot)
-            });
-            console.log(`[OpenAI Runner] ======================================`);
-          }
-
           // Log successful execution
           const resultOutput = result.success ? result.output : `Error: ${result.error}`;
           const truncatedResult = typeof resultOutput === 'string' && resultOutput.length > 500
@@ -1634,130 +1608,9 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           }
 
           // Track file changes for write_file and edit_file
-          console.log(`[OpenAI Runner] ========== CHECKING FILE TOOL CONDITION ==========`);
-          console.log(`[OpenAI Runner] Tool name:`, toolName);
-          console.log(`[OpenAI Runner] Is write_file or edit_file:`, toolName === 'write_file' || toolName === 'edit_file');
-          console.log(`[OpenAI Runner] Result success:`, result.success);
-          console.log(`[OpenAI Runner] Condition will be:`, (toolName === 'write_file' || toolName === 'edit_file') && result.success);
-          sendDebugLog(`Checking file tool condition`, {
-            toolName,
-            isFileTool: toolName === 'write_file' || toolName === 'edit_file',
-            resultSuccess: result.success,
-            conditionMet: (toolName === 'write_file' || toolName === 'edit_file') && result.success
-          });
-          
-          const debugInfo = {
-            toolName,
-            resultSuccess: result.success,
-            hasData: !!result.data,
-            dataKeys: result.data ? Object.keys(result.data) : [],
-            hasDiffSnapshot: !!(result.data && (result.data as any).diffSnapshot)
-          };
-          sendDebugLog(`Checking ${toolName} result`, debugInfo);
-          
           if ((toolName === 'write_file' || toolName === 'edit_file') && result.success) {
-            sendDebugLog(`Condition met for ${toolName} - processing result`);
             const filePath = toolArgs.file_path || toolArgs.path;
             const sessionStore = (global as any).sessionStore;
-            
-            console.log(`[OpenAI Runner] Processing ${toolName} result:`, {
-              hasData: !!result.data,
-              hasDiffSnapshot: !!(result.data && (result.data as any).diffSnapshot),
-              hasSessionStore: !!sessionStore,
-              sessionId: session.id,
-              toolCallId: toolCall.id,
-              resultData: result.data
-            });
-            
-            // Save diff snapshot to tool_use message if available
-            const hasData = !!result.data;
-            const hasDiffSnapshot = !!(result.data && (result.data as any).diffSnapshot);
-            const hasSessionStore = !!sessionStore;
-            
-            sendDebugLog(`Checking conditions for ${toolName}`, {
-              hasData,
-              hasDiffSnapshot,
-              hasSessionStore,
-              willSave: hasData && hasDiffSnapshot && hasSessionStore
-            });
-            
-            if (result.data && (result.data as any).diffSnapshot && sessionStore) {
-              try {
-                const diffSnapshot = (result.data as any).diffSnapshot;
-                const toolUseUuid = `tool_${toolCall.id}`;
-                
-                
-                // Update tool_use message in database to include diffSnapshot
-                sessionStore.updateMessageByUuid(session.id, toolUseUuid, {
-                  type: 'tool_use',
-                  id: toolCall.id,
-                  name: toolName,
-                  input: {
-                    ...toolArgs,
-                    diffSnapshot
-                  }
-                } as any);
-                
-                
-                // Send update event to UI to refresh the message
-                // Format as assistant message with tool_use content to match the structure in store
-                const updatePayload = {
-                  type: "stream.message" as any,
-                  payload: { 
-                    sessionId: session.id, 
-                    message: { 
-                      type: 'assistant',
-                      message: {
-                        id: `msg_${toolCall.id}`,
-                        content: [{
-                          type: 'tool_use',
-                          id: toolCall.id,
-                          name: toolName,
-                          input: {
-                            ...toolArgs,
-                            diffSnapshot
-                          }
-                        }]
-                      },
-                      _update: true, // Flag to indicate this is an update, not a new message
-                      _updateToolUseId: toolCall.id // ID of the tool_use to update
-                    } as any 
-                  }
-                };
-                
-                console.log(`[OpenAI Runner] ========== SENDING UPDATE EVENT ==========`);
-                console.log(`[OpenAI Runner] Event type:`, updatePayload.type);
-                console.log(`[OpenAI Runner] Session ID:`, updatePayload.payload.sessionId);
-                console.log(`[OpenAI Runner] Message type:`, updatePayload.payload.message.type);
-                console.log(`[OpenAI Runner] _update flag:`, updatePayload.payload.message._update);
-                console.log(`[OpenAI Runner] _updateToolUseId:`, updatePayload.payload.message._updateToolUseId);
-                console.log(`[OpenAI Runner] Tool use ID in content:`, updatePayload.payload.message.message.content[0].id);
-                console.log(`[OpenAI Runner] Has diffSnapshot:`, !!updatePayload.payload.message.message.content[0].input.diffSnapshot);
-                console.log(`[OpenAI Runner] DiffSnapshot keys:`, updatePayload.payload.message.message.content[0].input.diffSnapshot ? Object.keys(updatePayload.payload.message.message.content[0].input.diffSnapshot) : []);
-                console.log(`[OpenAI Runner] onEvent function:`, typeof onEvent);
-                console.log(`[OpenAI Runner] ==========================================`);
-                
-                try {
-                  onEvent(updatePayload);
-                  console.log(`[OpenAI Runner] ✓ Update event sent successfully for ${toolName} (${toolCall.id}): +${diffSnapshot.additions} -${diffSnapshot.deletions}`);
-                } catch (error) {
-                  console.error(`[OpenAI Runner] ✗ Failed to send update event:`, error);
-                }
-              } catch (error) {
-                console.error('[OpenAI Runner] ✗ Failed to save diff snapshot:', error);
-              }
-            } else {
-              console.warn(`[OpenAI Runner] ⚠ Cannot save diff snapshot for ${toolName}:`, {
-                toolName,
-                resultSuccess: result.success,
-                isWriteOrEdit: toolName === 'write_file' || toolName === 'edit_file',
-                hasData: !!result.data,
-                hasDiffSnapshot: !!(result.data && (result.data as any).diffSnapshot),
-                hasSessionStore: !!sessionStore,
-                resultData: result.data,
-                resultError: result.error
-              });
-            }
             
             if (filePath && session.cwd && sessionStore) {
               try {
@@ -1775,23 +1628,16 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
                   }
                 }
 
-                // Use diffSnapshot from tool result if available (more accurate)
-                // Fallback to git diff stats if diffSnapshot is not available
                 let additions = 0;
                 let deletions = 0;
                 
-                if (result.data && (result.data as any).diffSnapshot) {
-                  // Use diffSnapshot from tool result (works for all files, git or not)
-                  const diffSnapshot = (result.data as any).diffSnapshot;
-                  additions = diffSnapshot.additions || 0;
-                  deletions = diffSnapshot.deletions || 0;
-                } else if (isGitRepo(session.cwd)) {
-                  // Fallback to git diff stats if diffSnapshot is not available
+                if (isGitRepo(session.cwd)) {
+                  // Use git diff stats for file changes
                   const diffStats = getFileDiffStats(filePath, session.cwd);
                   additions = diffStats.additions;
                   deletions = diffStats.deletions;
                 } else {
-                  // For non-git repos without diffSnapshot, try to count lines from file
+                  // For non-git repos, try to count lines from file (write_file only)
                   try {
                     const { readFile } = require('fs');
                     const { resolve } = require('path');

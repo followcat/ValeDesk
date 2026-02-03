@@ -4,6 +4,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { TodoItem, TodoStatus, FileChange } from "../types";
 import { DiffViewerModal } from "./DiffViewerModal";
 import type { ChangedFile } from "./ChangedFiles";
@@ -31,6 +32,7 @@ export function TodoPanel({
   onConfirmChanges,
   onRollbackChanges
 }: TodoPanelProps) {
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAllFiles, setShowAllFiles] = useState(false);
   const [selectedFile, setSelectedFile] = useState<ChangedFile | null>(null);
@@ -110,7 +112,7 @@ export function TodoPanel({
             ▼
           </span>
           <span className="text-sm font-medium text-ink-700 flex-shrink-0">
-            {isAllDone ? '✅ Plan Complete' : '📋 Task Plan'}
+            {isAllDone ? t("todoPanel.planComplete") : t("todoPanel.taskPlan")}
           </span>
           <span className="text-xs text-ink-500 flex-shrink-0">
             {completed}/{total}
@@ -124,13 +126,13 @@ export function TodoPanel({
           {/* Show completion message when collapsed and done */}
           {!isExpanded && isAllDone && (
             <span className="text-xs text-green-600 ml-1">
-              All tasks completed!
+              {t("todoPanel.allTasksCompleted")}
             </span>
           )}
           {/* Show file changes summary when collapsed */}
           {!isExpanded && hasPendingChanges && (
             <span className="text-xs text-orange-600 ml-1">
-              ({pendingFileChanges.length} files changed)
+              {t("todoPanel.filesChanged", { count: pendingFileChanges.length })}
             </span>
           )}
         </div>
@@ -164,7 +166,7 @@ export function TodoPanel({
             {isAllDone && (
               <div className="bg-green-100 border border-green-300 rounded px-2 py-1.5 mb-2 text-center">
                 <span className="text-xs text-green-700 font-medium">
-                  🎉 All {completed} tasks completed!
+                  {t("todoPanel.allTasksCompletedCount", { count: completed })}
                 </span>
               </div>
             )}
@@ -189,7 +191,7 @@ export function TodoPanel({
                   <div className="flex items-center gap-2">
                     <span className="text-sm">📁</span>
                     <span className="text-xs text-orange-700 font-medium">
-                      Changed Files ({pendingFileChanges.length})
+                      {t("todoPanel.changedFiles", { count: pendingFileChanges.length })}
                     </span>
                     {/* Summary stats */}
                     {(totalAdditions > 0 || totalDeletions > 0) && (
@@ -235,9 +237,9 @@ export function TodoPanel({
                         type="button"
                         onClick={() => handleViewDiff(change)}
                         className="ml-2 px-2 py-0.5 text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-100 rounded transition-colors flex-shrink-0"
-                        title="View diff"
+                        title={t("changedFiles.viewDiff")}
                       >
-                        View Diff
+                        {t("todoPanel.viewDiff")}
                       </button>
                     </div>
                   </div>
@@ -251,8 +253,8 @@ export function TodoPanel({
                     className="text-xs text-orange-600 hover:text-orange-700 font-medium mt-1 ml-1"
                   >
                     {showAllFiles
-                      ? `Show less (-${pendingFileChanges.length - 4} files)`
-                      : `Show ${pendingFileChanges.length - 4} more files...`
+                      ? t("todoPanel.showLessFiles", { count: pendingFileChanges.length - 4 })
+                      : t("todoPanel.showMoreFiles", { count: pendingFileChanges.length - 4 })
                     }
                   </button>
                 )}
@@ -267,7 +269,7 @@ export function TodoPanel({
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Confirm
+                    {t("common.confirm")}
                   </button>
                   <button
                     type="button"
@@ -277,7 +279,7 @@ export function TodoPanel({
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    Rollback
+                    {t("common.rollback")}
                   </button>
                 </div>
               </div>
@@ -331,6 +333,7 @@ export function TodoPanel({
         file={selectedFile}
         files={changedFiles}
         cwd={cwd}
+        sessionId={activeSessionId ?? undefined}
         open={diffModalOpen}
         onClose={() => {
           setDiffModalOpen(false);

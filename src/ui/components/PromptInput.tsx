@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { ClientEvent, Attachment, AttachmentType, CharterData } from "../types";
 import { useAppStore } from "../store/useAppStore";
+import { DEFAULT_SESSION_TITLE } from "../constants";
 
 const DEFAULT_ALLOWED_TOOLS = "Read,Edit,Bash";
 const MAX_ROWS = 12;
@@ -37,6 +38,7 @@ interface PromptInputProps {
 }
 
 export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
+  const { t } = useTranslation();
   const prompt = useAppStore((state) => state.prompt);
   const cwd = useAppStore((state) => state.cwd);
   const activeSessionId = useAppStore((state) => state.activeSessionId);
@@ -66,9 +68,9 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
       setPendingStart(true);
       
       // Keep default title so backend can auto-generate when prompt exists
-      let title = "New Chat";
+      let title = DEFAULT_SESSION_TITLE;
       if (!trimmedPrompt && attachments.length > 0) {
-        title = `Attachment: ${attachments[0].name}`;
+        title = t("prompt.attachmentTitle", { name: attachments[0].name });
       }
       sendEvent({
         type: "session.start",
@@ -101,7 +103,7 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
       } as ClientEvent);
     } else {
       if (activeSession?.status === "running") {
-        setGlobalError("Session is still running. Please wait for it to finish.");
+        setGlobalError(t("app.sessionRunningError"));
         return;
       }
       sendEvent({
@@ -115,7 +117,7 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
     }
     setPrompt("");
     clearAttachments();
-  }, [activeSession, activeSessionId, cwd, prompt, sendEvent, setGlobalError, setPendingStart, setPrompt, selectedModel, selectedTemperature, sendTemperature, attachments, clearAttachments, apiSettings?.enableSessionGitRepo]);
+  }, [activeSession, activeSessionId, cwd, prompt, sendEvent, setGlobalError, setPendingStart, setPrompt, selectedModel, selectedTemperature, sendTemperature, attachments, clearAttachments, apiSettings?.enableSessionGitRepo, t]);
 
   const handleStop = useCallback(() => {
     if (!activeSessionId) return;
@@ -136,6 +138,7 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
  * Shows thumbnails for images, icons for video/audio, and file info (name, size).
  */
 function AttachmentPreview({ attachment, onRemove }: { attachment: Attachment; onRemove: () => void }) {
+  const { t } = useTranslation();
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -172,7 +175,7 @@ function AttachmentPreview({ attachment, onRemove }: { attachment: Attachment; o
       <button
         onClick={onRemove}
         className="absolute -top-1.5 -right-1.5 h-5 w-5 flex items-center justify-center bg-error text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-        aria-label="Remove attachment"
+        aria-label={t("prompt.removeAttachment")}
       >
         <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M6 18L18 6M6 6l12 12"/>
@@ -183,6 +186,7 @@ function AttachmentPreview({ attachment, onRemove }: { attachment: Attachment; o
 }
 
 export function PromptInput({ sendEvent }: PromptInputProps) {
+  const { t } = useTranslation();
   const { prompt, setPrompt, isRunning, handleSend, handleStop } = usePromptActions(sendEvent);
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -201,13 +205,13 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
   const processFile = useCallback(async (file: File): Promise<Attachment | null> => {
     const attachmentType = getAttachmentType(file.type);
     if (!attachmentType) {
-      setGlobalError(`Unsupported file type: ${file.type}`);
+      setGlobalError(t("prompt.errorUnsupportedFileType", { type: file.type }));
       return null;
     }
 
     if (file.size > MAX_FILE_SIZE) {
       const maxSizeMB = MAX_FILE_SIZE / (1024 * 1024);
-      setGlobalError(`File too large: ${file.name}. Maximum size is ${maxSizeMB}MB.`);
+      setGlobalError(t("prompt.errorFileTooLarge", { name: file.name, size: maxSizeMB }));
       return null;
     }
 
@@ -225,7 +229,7 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
         });
       };
       reader.onerror = () => {
-        setGlobalError(`Failed to read file: ${file.name}`);
+        setGlobalError(t("prompt.errorFailedToReadFile", { name: file.name }));
         resolve(null);
       };
       reader.readAsDataURL(file);
@@ -443,8 +447,8 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:text-ink-700 hover:bg-surface-secondary transition-colors"
-            aria-label="Attach file"
-            title="Attach image, video, or audio"
+            aria-label={t("prompt.attachFile")}
+            title={t("prompt.attachFileTitle")}
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -453,7 +457,7 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
           <textarea
             rows={1}
             className="flex-1 resize-none bg-transparent py-1.5 text-sm text-ink-800 placeholder:text-muted focus:outline-none"
-            placeholder={attachments.length > 0 ? "Add a message to your attachments..." : "Describe what you want agent to handle..."}
+            placeholder={attachments.length > 0 ? t("prompt.placeholderWithAttachments") : t("prompt.placeholder")}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -464,7 +468,7 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
           <button
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${isRunning ? "bg-error text-white hover:bg-error/90" : "bg-accent text-white hover:bg-accent-hover"}`}
             onClick={isRunning ? handleStop : () => { void handleSend(); }}
-            aria-label={isRunning ? "Stop session" : "Send prompt"}
+            aria-label={isRunning ? t("prompt.stopSession") : t("prompt.sendPrompt")}
           >
             {isRunning ? (
               <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" /></svg>
@@ -475,7 +479,13 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
           </div>
         </div>
         <div className="mt-2 px-2 text-xs text-muted text-center">
-          Press <span className="font-medium text-ink-700">Enter</span> to send • <span className="font-medium text-ink-700">Shift + Enter</span> for new line • Paste to add screenshot
+          <Trans
+            i18nKey="prompt.hint"
+            components={{
+              enter: <span className="font-medium text-ink-700" />,
+              shift: <span className="font-medium text-ink-700" />
+            }}
+          />
         </div>
       </div>
     </section>

@@ -17,7 +17,6 @@ export type PendingPermission = {
 export type Session = {
   id: string;
   title: string;
-  claudeSessionId?: string;
   status: SessionStatus;
   cwd?: string;
   allowedTools?: string;
@@ -47,7 +46,6 @@ export type StoredSession = {
   lastPrompt?: string;
   model?: string;
   threadId?: string;
-  claudeSessionId?: string;
   isPinned?: boolean;
   createdAt: number;
   updatedAt: number;
@@ -153,7 +151,6 @@ export class MemorySessionStore {
       lastPrompt: session.lastPrompt,
       model: session.model,
       threadId: session.threadId,
-      claudeSessionId: session.claudeSessionId,
       isPinned: false,
       createdAt: now,
       updatedAt: now,
@@ -178,7 +175,6 @@ export class MemorySessionStore {
         lastPrompt: session.lastPrompt,
         model: session.model,
         threadId: session.threadId,
-        claudeSessionId: session.claudeSessionId,
         isPinned: false,
         createdAt: now,
         updatedAt: now,
@@ -331,9 +327,8 @@ export class MemorySessionStore {
           messages[i] = updatedMessage as StreamMessage;
           this.messages.set(sessionId, messages);
           
-          console.log(`[MemorySessionStore] ✓ Updated tool_use message ${uuid} with diffSnapshot:`, {
-            newInputKeys: Object.keys(updatedMessage.input),
-            hasDiffSnapshot: !!updatedMessage.input.diffSnapshot
+          console.log(`[MemorySessionStore] ✓ Updated tool_use message ${uuid}:`, {
+            newInputKeys: Object.keys(updatedMessage.input)
           });
           
           // Sync updated message to Rust DB

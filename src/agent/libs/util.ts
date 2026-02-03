@@ -1,90 +1,11 @@
-import { claudeCodeEnv, loadClaudeSettingsEnv } from "./claude-settings.js";
 import { loadApiSettings } from "./settings-store.js";
 import { loadLLMProviderSettings } from "./llm-providers-store.js";
-import type { ApiSettings } from "../types.js";
-import { join } from "path";
-import { homedir } from "os";
 import OpenAI from "openai";
 
-import { createRequire } from "module";
-// In pkg binary, import.meta.url is undefined. Use eval to get require in CJS context.
-const require = (process as any).pkg
-  ? eval('require')
-  : (typeof globalThis.require === "function" ? globalThis.require : createRequire(import.meta.url));
-
-function getElectronApp(): any | null {
-  const electronVersion = (process.versions as any)?.electron;
-  if (!electronVersion) return null;
-  const electron = require("electron");
-  return electron.app;
-}
-
-// Get Claude Code CLI path for packaged app
-export function getClaudeCodePath(): string | undefined {
-  const app = getElectronApp();
-  if (app?.isPackaged) {
-    return join(
-      (process as any).resourcesPath,
-      'app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk/cli.js'
-    );
-  }
-  return undefined;
-}
-
-// Build enhanced PATH for packaged environment
-export function getEnhancedEnv(guiSettings?: ApiSettings | null): Record<string, string | undefined> {
-  const home = homedir();
-  const additionalPaths = [
-    '/usr/local/bin',
-    '/opt/homebrew/bin',
-    `${home}/.bun/bin`,
-    `${home}/.nvm/versions/node/v20.0.0/bin`,
-    `${home}/.nvm/versions/node/v22.0.0/bin`,
-    `${home}/.nvm/versions/node/v18.0.0/bin`,
-    `${home}/.volta/bin`,
-    `${home}/.fnm/aliases/default/bin`,
-    '/usr/bin',
-    '/bin',
-  ];
-
-  const currentPath = process.env.PATH || '';
-  const newPath = [...additionalPaths, currentPath].join(':');
-
-  // Load settings with GUI priority
-  const settings = loadClaudeSettingsEnv(guiSettings);
-
-  // Get temperature from GUI settings, default to 0.3 for vLLM
-  const temperature = guiSettings?.temperature !== undefined
-    ? String(guiSettings.temperature)
-    : '0.3';
-
-  return {
-    ...process.env,
-    PATH: newPath,
-    // Apply Claude settings
-    ANTHROPIC_AUTH_TOKEN: settings.ANTHROPIC_AUTH_TOKEN,
-    ANTHROPIC_BASE_URL: settings.ANTHROPIC_BASE_URL,
-    ANTHROPIC_MODEL: settings.ANTHROPIC_MODEL,
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: settings.ANTHROPIC_DEFAULT_HAIKU_MODEL,
-    ANTHROPIC_DEFAULT_OPUS_MODEL: settings.ANTHROPIC_DEFAULT_OPUS_MODEL,
-    ANTHROPIC_DEFAULT_SONNET_MODEL: settings.ANTHROPIC_DEFAULT_SONNET_MODEL,
-    API_TIMEOUT_MS: settings.API_TIMEOUT_MS,
-    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: settings.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC,
-    // Try to set temperature for vLLM/OpenAI-compatible APIs
-    ANTHROPIC_TEMPERATURE: temperature,
-    TEMPERATURE: temperature,
-    // Enable debug logging for Claude SDK
-    DEBUG: 'anthropic:*',
-    ANTHROPIC_LOG_LEVEL: 'debug',
-    NODE_DEBUG: 'http,https',
-  };
-}
-
-export const claudeCodePath = getClaudeCodePath();
-export const enhancedEnv = getEnhancedEnv();
+export const DEFAULT_SESSION_TITLE = "New Chat";
 
 export const generateSessionTitle = async (userIntent: string | null, sessionModel?: string) => {
-  if (!userIntent) return "New Chat";
+  if (!userIntent) return DEFAULT_SESSION_TITLE;
 
   try {
     let apiKey: string | undefined;
@@ -98,7 +19,7 @@ export const generateSessionTitle = async (userIntent: string | null, sessionMod
 
       if (llmSettings) {
         const provider = llmSettings.providers.find((p) => p.id === providerId);
-        if (provider && provider.type !== "claude-code") {
+        if (provider) {
           apiKey = provider.apiKey;
           modelName = modelId;
 
@@ -210,7 +131,7 @@ function extractFallbackTitle(text: string): string {
     : cleaned.split(/\s+/).slice(0, 2).join(' ');
 
   if (!titleRaw) {
-    return "New Chat";
+    return DEFAULT_SESSION_TITLE;
   }
 
   // Capitalize first letter of each word (noop for non-Latin scripts)

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { MultiThreadTask, SessionInfo } from "../types";
 
 interface MultiThreadPanelProps {
@@ -16,9 +17,10 @@ export function MultiThreadPanel({
   onDeleteTask,
   sendEvent
 }: MultiThreadPanelProps) {
+  const { t } = useTranslation();
   // Extract model name from full ID (provider::model -> model)
   const getModelDisplayName = (modelId: string | undefined): string => {
-    if (!modelId) return 'Unknown';
+    if (!modelId) return t("common.unknown");
     // If it contains ::, take the part after it
     if (modelId.includes('::')) {
       return modelId.split('::')[1] || modelId;
@@ -76,7 +78,7 @@ export function MultiThreadPanel({
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                   {isCreated && (
-                    <span className="w-2 h-2 rounded-full bg-warning" title="Ready to start" />
+                    <span className="w-2 h-2 rounded-full bg-warning" title={t("multiThread.readyToStart")} />
                   )}
                   {isRunning && (
                     <span className="w-2 h-2 rounded-full bg-info animate-pulse" />
@@ -91,7 +93,7 @@ export function MultiThreadPanel({
                 <button
                   onClick={() => onDeleteTask(task.id)}
                   className="text-muted hover:text-error transition-colors flex-shrink-0"
-                  title="Remove task"
+                  title={t("multiThread.removeTask")}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -102,16 +104,16 @@ export function MultiThreadPanel({
               {/* Mode badge */}
               <div className="flex items-center gap-1 mb-2">
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-accent/10 text-accent">
-                  {task.mode === 'consensus' ? 'Consensus' : 'Different Tasks'}
+                  {task.mode === 'consensus' ? t("taskItem.modeConsensus") : t("taskItem.modeDifferent")}
                 </span>
                 {task.shareWebCache && (
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-ink-100 text-ink-600">
-                    Shared Cache
+                    {t("sidebar.sharedCache")}
                   </span>
                 )}
                 {task.autoSummary && (
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-purple-100 text-purple-600">
-                    Auto-Summary
+                    {t("sidebar.autoSummary")}
                   </span>
                 )}
               </div>
@@ -136,13 +138,13 @@ export function MultiThreadPanel({
               <div className="flex items-center justify-between text-xs mb-2">
                 <span className="text-muted">
                   {isCreated
-                    ? `${totalCount} threads ready`
-                    : `${completedCount}/${totalCount} threads done`
+                    ? t("sidebar.threadsReady", { count: totalCount })
+                    : t("sidebar.threadsDone", { completed: completedCount, total: totalCount })
                   }
                 </span>
                 {totalTokens > 0 && (
                   <span className="text-[10px] text-muted bg-ink-100 px-1.5 py-0.5 rounded-full">
-                    {totalTokens.toLocaleString()} tokens
+                    {t("sidebar.tokensLabel", { count: totalTokens })}
                   </span>
                 )}
                 {isCreated && (
@@ -150,22 +152,22 @@ export function MultiThreadPanel({
                     onClick={() => sendEvent({ type: 'task.start', payload: { taskId: task.id } })}
                     className="text-xs font-medium px-2 py-1 bg-warning text-white rounded hover:bg-warning/80 transition-colors"
                   >
-                    ▶ Start All Threads
+                    {t("multiThread.startAllThreads")}
                   </button>
                 )}
                 {isRunning && (
                   <span className="text-info font-medium">
-                    {runningCount} running...
+                    {t("sidebar.runningCount", { count: runningCount })}
                   </span>
                 )}
                 {isCompleted && (
                   <span className="text-success font-medium">
-                    ✓ Complete
+                    {t("multiThread.complete")}
                   </span>
                 )}
                 {errorCount > 0 && (
                   <span className="text-error font-medium">
-                    {errorCount} errors
+                    {t("sidebar.errors", { count: errorCount })}
                   </span>
                 )}
               </div>
@@ -176,7 +178,7 @@ export function MultiThreadPanel({
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
-                  Threads working together
+                  {t("multiThread.threadsWorking")}
                 </div>
                 <div className="space-y-1 max-h-28 overflow-y-auto">
                   {threads.map((thread) => {
@@ -203,7 +205,7 @@ export function MultiThreadPanel({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1">
                             <span className={`text-xs truncate ${isSummaryThread ? 'text-purple-700 font-medium' : 'text-ink-600'}`}>
-                              {isSummaryThread ? '📋 Summary' : getModelDisplayName(thread.model)}
+                              {isSummaryThread ? t("sidebar.summary") : getModelDisplayName(thread.model)}
                             </span>
                           </div>
                         </div>

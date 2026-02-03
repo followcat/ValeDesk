@@ -24,7 +24,6 @@ impl Database {
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
-                claude_session_id TEXT,
                 status TEXT NOT NULL DEFAULT 'idle',
                 cwd TEXT,
                 allowed_tools TEXT,
@@ -169,7 +168,6 @@ impl Database {
         Ok(Session {
             id,
             title: params.title.clone(),
-            claude_session_id: None,
             status: "idle".to_string(),
             cwd: params.cwd.clone(),
             allowed_tools: params.allowed_tools.clone(),
@@ -305,11 +303,6 @@ impl Database {
         if let Some(ref last_prompt) = params.last_prompt {
             updates.push(format!("last_prompt = ?{}", idx));
             values.push(Box::new(last_prompt.clone()));
-            idx += 1;
-        }
-        if let Some(ref claude_session_id) = params.claude_session_id {
-            updates.push(format!("claude_session_id = ?{}", idx));
-            values.push(Box::new(claude_session_id.clone()));
             idx += 1;
         }
         if let Some(input_tokens) = params.input_tokens {
@@ -555,8 +548,6 @@ impl Database {
 pub struct Session {
     pub id: String,
     pub title: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub claude_session_id: Option<String>,
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
@@ -625,8 +616,6 @@ pub struct UpdateSessionParams {
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_prompt: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub claude_session_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_tokens: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
