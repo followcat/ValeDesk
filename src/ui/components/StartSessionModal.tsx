@@ -401,7 +401,8 @@ export function StartSessionModal({
     }
 
     const hasText = e.clipboardData?.types?.includes("text/plain");
-    if (!hasText) e.preventDefault();
+    if (hasText) return;
+    e.preventDefault();
 
     void (async () => {
       const file = await readImageFromClipboardApi();
