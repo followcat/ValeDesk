@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import type { ClientEvent, Attachment, AttachmentType, CharterData } from "../types";
 import { useAppStore } from "../store/useAppStore";
 import { DEFAULT_SESSION_TITLE } from "../constants";
