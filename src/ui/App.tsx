@@ -372,7 +372,6 @@ function App() {
     sendEvent({ type: "task.create", payload });
     setShowTaskDialog(false);
   }, [sendEvent]);
-
   return (
     <div className="flex h-screen bg-surface">
       <Sidebar
