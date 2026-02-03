@@ -185,7 +185,9 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
 
   // Session startup validation (Charter + ADR integrity)
   const sessionStore = (global as any).sessionStore;
-  const sessionData = sessionStore?.getSession(session.id);
+  const sessionData = typeof sessionStore?.getSession === 'function'
+    ? sessionStore.getSession(session.id)
+    : undefined;
   if (sessionData) {
     const validationResult = validateSession({
       charter: sessionData.charter,
@@ -1370,7 +1372,9 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
           // In default mode, execute immediately without asking
 
           // Compliance gate: check action against charter constraints
-          const currentSessionData = sessionStore?.getSession(session.id);
+          const currentSessionData = typeof sessionStore?.getSession === 'function'
+            ? sessionStore.getSession(session.id)
+            : undefined;
           if (currentSessionData?.charter) {
             const actionIntent = createActionIntent(toolName, toolArgs);
             const complianceResult: ComplianceResult = checkActionCompliance(actionIntent, {
@@ -1526,7 +1530,9 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
             },
             onCharterChanged: (charter, charterHash) => {
               // Emit session status update with new charter
-              const updatedSession = sessionStore?.getSession(session.id);
+              const updatedSession = typeof sessionStore?.getSession === 'function'
+                ? sessionStore.getSession(session.id)
+                : undefined;
               if (updatedSession) {
                 onEvent({
                   type: 'session.status',
@@ -1546,7 +1552,9 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
             },
             onADRsChanged: (adrs) => {
               // Emit session status update with new ADRs
-              const updatedSession = sessionStore?.getSession(session.id);
+              const updatedSession = typeof sessionStore?.getSession === 'function'
+                ? sessionStore.getSession(session.id)
+                : undefined;
               if (updatedSession) {
                 onEvent({
                   type: 'session.status',

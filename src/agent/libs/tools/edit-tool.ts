@@ -4,6 +4,7 @@
 
 import { readFile, writeFile } from 'fs/promises';
 import { resolve } from 'path';
+import { diffLines } from 'diff';
 import type { ToolDefinition, ToolResult, ToolExecutionContext } from './base-tool.js';
 
 export const EditToolDefinition: ToolDefinition = {

@@ -20,7 +20,7 @@ import { loadSkillsSettings, toggleSkill, setMarketplaceUrl } from "../agent/lib
 import { fetchSkillsFromMarketplace } from "../agent/libs/skills-loader.js";
 import { webCache } from "../agent/libs/web-cache.js";
 import * as gitUtils from "../agent/git-utils.js";
-import { generateSessionTitle } from "../agent/libs/util.js";
+import { generateSessionTitle, DEFAULT_SESSION_TITLE } from "../agent/libs/util.js";
 import { handlePreviewApproval, handleBatchApproval } from "../agent/libs/preview-manager.js";
 
 type RunnerHandle = {
