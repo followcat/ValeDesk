@@ -188,9 +188,9 @@ impl Database {
     }
 
     pub fn clone_session(&self, source_id: &str) -> SqliteResult<Option<Session>> {
-        let conn = self.conn.lock().unwrap();
         let now = chrono::Utc::now().timestamp_millis();
 
+        // IMPORTANT: fetch source session outside the DB lock to avoid deadlocks.
         let source = match self.get_session(source_id)? {
             Some(s) => s,
             None => return Ok(None),
@@ -199,69 +199,78 @@ impl Database {
         let new_id = uuid::Uuid::new_v4().to_string();
         let new_title = format!("{} (clone)", source.title);
 
-        // Raw JSON fields are stored as TEXT in sessions table.
-        let todos_json: Option<String> = conn.query_row(
-            "SELECT todos FROM sessions WHERE id = ?1",
-            [source_id],
-            |r| r.get(0),
-        )?;
-        let file_changes_json: Option<String> = conn.query_row(
-            "SELECT file_changes FROM sessions WHERE id = ?1",
-            [source_id],
-            |r| r.get(0),
-        )?;
-        let charter_json: Option<String> = conn.query_row(
-            "SELECT charter FROM sessions WHERE id = ?1",
-            [source_id],
-            |r| r.get(0),
-        )?;
-        let adrs_json: Option<String> = conn.query_row(
-            "SELECT adrs FROM sessions WHERE id = ?1",
-            [source_id],
-            |r| r.get(0),
-        )?;
+        {
+            let mut conn = self.conn.lock().unwrap();
+            let tx = conn.transaction()?;
 
-        // Clone session settings; clear thread_id to make it an independent session.
-        conn.execute(
-            r#"INSERT INTO sessions 
-               (id, title, status, cwd, allowed_tools, last_prompt, model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, todos, file_changes, created_at, updated_at, charter, charter_hash, adrs)
-               VALUES (?1, ?2, 'idle', ?3, ?4, ?5, ?6, NULL, ?7, ?8, 0, 0, 0, ?9, ?10, ?11, ?12, ?13, ?14, ?15)"#,
-            params![
-                &new_id,
-                &new_title,
-                &source.cwd,
-                &source.allowed_tools,
-                &source.last_prompt,
-                &source.model,
-                &source.temperature,
-                &source.enable_session_git_repo,
-                &todos_json,
-                &file_changes_json,
-                now,
-                now,
-                &charter_json,
-                &source.charter_hash,
-                &adrs_json,
-            ],
-        )?;
-
-        // Clone messages (keep their original JSON payload), generate new message ids.
-        let mut stmt = conn.prepare(
-            "SELECT data, created_at FROM messages WHERE session_id = ?1 ORDER BY created_at ASC",
-        )?;
-        let rows = stmt.query_map([source_id], |row| {
-            let data: String = row.get(0)?;
-            let created_at: i64 = row.get(1)?;
-            Ok((data, created_at))
-        })?;
-
-        for row in rows {
-            let (data, created_at) = row?;
-            let msg_id = uuid::Uuid::new_v4().to_string();
-            conn.execute(
-                "INSERT INTO messages (id, session_id, data, created_at) VALUES (?1, ?2, ?3, ?4)",
-                params![&msg_id, &new_id, &data, created_at],
+            // Raw JSON fields are stored as TEXT in sessions table.
+            let todos_json: Option<String> = tx.query_row(
+                "SELECT todos FROM sessions WHERE id = ?1",
+                [source_id],
+                |r| r.get(0),
             )?;
+            let file_changes_json: Option<String> = tx.query_row(
+                "SELECT file_changes FROM sessions WHERE id = ?1",
+                [source_id],
+                |r| r.get(0),
+            )?;
+            let charter_json: Option<String> = tx.query_row(
+                "SELECT charter FROM sessions WHERE id = ?1",
+                [source_id],
+                |r| r.get(0),
+            )?;
+            let adrs_json: Option<String> = tx.query_row(
+                "SELECT adrs FROM sessions WHERE id = ?1",
+                [source_id],
+                |r| r.get(0),
+            )?;
+
+            // Clone session settings; clear thread_id to make it an independent session.
+            tx.execute(
+                r#"INSERT INTO sessions 
+                   (id, title, status, cwd, allowed_tools, last_prompt, model, thread_id, temperature, enable_session_git_repo, is_pinned, input_tokens, output_tokens, todos, file_changes, created_at, updated_at, charter, charter_hash, adrs)
+                   VALUES (?1, ?2, 'idle', ?3, ?4, ?5, ?6, NULL, ?7, ?8, 0, 0, 0, ?9, ?10, ?11, ?12, ?13, ?14, ?15)"#,
+                params![
+                    &new_id,
+                    &new_title,
+                    &source.cwd,
+                    &source.allowed_tools,
+                    &source.last_prompt,
+                    &source.model,
+                    &source.temperature,
+                    &source.enable_session_git_repo,
+                    &todos_json,
+                    &file_changes_json,
+                    now,
+                    now,
+                    &charter_json,
+                    &source.charter_hash,
+                    &adrs_json,
+                ],
+            )?;
+
+            // Clone messages (keep their original JSON payload), generate new message ids.
+            {
+                let mut stmt = tx.prepare(
+                    "SELECT data, created_at FROM messages WHERE session_id = ?1 ORDER BY created_at ASC",
+                )?;
+                let rows = stmt.query_map([source_id], |row| {
+                    let data: String = row.get(0)?;
+                    let created_at: i64 = row.get(1)?;
+                    Ok((data, created_at))
+                })?;
+
+                for row in rows {
+                    let (data, created_at) = row?;
+                    let msg_id = uuid::Uuid::new_v4().to_string();
+                    tx.execute(
+                        "INSERT INTO messages (id, session_id, data, created_at) VALUES (?1, ?2, ?3, ?4)",
+                        params![&msg_id, &new_id, &data, created_at],
+                    )?;
+                }
+            }
+
+            tx.commit()?;
         }
 
         self.get_session(&new_id)
