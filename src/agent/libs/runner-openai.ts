@@ -907,6 +907,7 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
 
           for (let attempt = 0; attempt <= MAX_STREAM_RETRIES; attempt++) {
             let assistantMessage = '';
+            let assistantThinking = '';
             let toolCalls: any[] = [];
             let contentStarted = false;
             let streamMetadata: { id?: string; model?: string; created?: number; finishReason?: string; usage?: any } = {};
@@ -942,6 +943,11 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
 
                 const delta = chunk.choices[0]?.delta;
                 if (!delta) continue;
+
+                const thinkingDelta = (delta as any).thinking ?? (delta as any).reasoning ?? (delta as any).reasoning_content;
+                if (typeof thinkingDelta === 'string' && thinkingDelta) {
+                  assistantThinking += thinkingDelta;
+                }
 
                 if (delta.content) {
                   if (!contentStarted) {
@@ -1000,7 +1006,7 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
                 });
               }
 
-              return { assistantMessage, toolCalls, streamMetadata };
+              return { assistantMessage, assistantThinking, toolCalls, streamMetadata };
             } catch (error) {
               lastError = error;
               const retryable = isRetryableNetworkError(error);
@@ -1031,7 +1037,7 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
           throw lastError ?? new Error('Unknown stream error');
         };
 
-        const { assistantMessage, toolCalls, streamMetadata } = await runStreamWithRetries();
+        const { assistantMessage, assistantThinking, toolCalls, streamMetadata } = await runStreamWithRetries();
 
         // Check if aborted during stream
         if (aborted) {
@@ -1055,6 +1061,26 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
           totalOutputTokens += streamMetadata.usage.completion_tokens || 0;
         }
         
+        const normalizedToolCalls = toolCalls.filter(Boolean);
+
+        if (assistantThinking?.trim()) {
+          const MAX_THINKING_CHARS = 50_000;
+          const truncatedThinking = assistantThinking.length > MAX_THINKING_CHARS
+            ? assistantThinking.slice(0, MAX_THINKING_CHARS) + `\n... [truncated ${assistantThinking.length - MAX_THINKING_CHARS} chars]`
+            : assistantThinking;
+          executionLogger.logReasoning(truncatedThinking, `iteration=${iterationCount} model=${modelName}`);
+        }
+
+        executionLogger.logLLMResponse({
+          finishReason: streamMetadata.finishReason || '',
+          textLength: assistantMessage.length,
+          toolCallsCount: normalizedToolCalls.length,
+          thinkingLength: assistantThinking?.length || 0,
+          inputTokens: streamMetadata.usage?.prompt_tokens,
+          outputTokens: streamMetadata.usage?.completion_tokens,
+          durationMs: Date.now() - iterationStartTime
+        });
+
         // Log response to file
         const responsePayload = {
           id: streamMetadata.id,
@@ -1064,8 +1090,9 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
           message: {
             role: 'assistant',
             content: assistantMessage || null,
-            tool_calls: toolCalls.length > 0 ? toolCalls : undefined
+            tool_calls: normalizedToolCalls.length > 0 ? normalizedToolCalls : undefined
           },
+          thinking: assistantThinking || undefined,
           timestamp: new Date().toISOString()
         };
         logTurn(session.id, iterationCount, 'response', responsePayload);
