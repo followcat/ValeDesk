@@ -375,6 +375,7 @@ export type ServerEvent =
   | { type: "session.list"; payload: { sessions: SessionInfo[] } }
   | { type: "session.history"; payload: { sessionId: string; status: SessionStatus; messages: StreamMessage[]; inputTokens?: number; outputTokens?: number; todos?: TodoItem[]; model?: string; fileChanges?: FileChange[]; hasMore?: boolean; nextCursor?: number; page?: "initial" | "prepend" } }
   | { type: "session.deleted"; payload: { sessionId: string } }
+  | { type: "session.cloned"; payload: { session: SessionInfo } }
   | { type: "permission.request"; payload: { sessionId: string; toolUseId: string; toolName: string; input: unknown; explanation?: string } }
   | { type: "runner.error"; payload: { sessionId?: string; message: string } }
   | { type: "settings.loaded"; payload: { settings: ApiSettings | null } }
@@ -413,6 +414,7 @@ export type ClientEvent =
   | { type: "session.continue"; payload: { sessionId: string; prompt: string; retry?: boolean; retryReason?: string; attachments?: Attachment[] } }
   | { type: "session.stop"; payload: { sessionId: string; } }
   | { type: "session.delete"; payload: { sessionId: string; } }
+  | { type: "session.clone"; payload: { sessionId: string; } }
   | { type: "session.pin"; payload: { sessionId: string; isPinned: boolean; } }
   | { type: "session.update-cwd"; payload: { sessionId: string; cwd: string; } }
   | { type: "session.update"; payload: { sessionId: string; model?: string; temperature?: number; sendTemperature?: boolean; title?: string; } }

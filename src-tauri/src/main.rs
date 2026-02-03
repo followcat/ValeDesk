@@ -1429,6 +1429,47 @@ fn client_event(app: tauri::AppHandle, state: tauri::State<'_, AppState>, event:
       Ok(())
     }
 
+    // Session clone - duplicate an existing session (settings + history)
+    "session.clone" => {
+      let payload = event.get("payload")
+        .ok_or_else(|| "[session.clone] missing payload".to_string())?;
+      let session_id = payload.get("sessionId")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "[session.clone] missing sessionId".to_string())?;
+
+      match state.db.clone_session(session_id) {
+        Ok(Some(session)) => {
+          emit_server_event_app(&app, &json!({
+            "type": "session.cloned",
+            "payload": { "session": session }
+          }))?;
+
+          // Send updated session list
+          let sessions = state.db.list_sessions()
+            .map_err(|e| format!("[session.clone] list failed: {}", e))?;
+          emit_server_event_app(&app, &json!({
+            "type": "session.list",
+            "payload": { "sessions": sessions }
+          }))?;
+          Ok(())
+        }
+        Ok(None) => {
+          emit_server_event_app(&app, &json!({
+            "type": "runner.error",
+            "payload": { "message": "Session not found" }
+          }))?;
+          Ok(())
+        }
+        Err(e) => {
+          emit_server_event_app(&app, &json!({
+            "type": "runner.error",
+            "payload": { "message": format!("Failed to clone session: {}", e) }
+          }))?;
+          Ok(())
+        }
+      }
+    }
+
     // Code Sandbox - execute JS/Python in Rust
     "sandbox.execute" => {
       let payload = event.get("payload").ok_or_else(|| "[sandbox.execute] missing payload".to_string())?;

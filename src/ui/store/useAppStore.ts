@@ -368,6 +368,38 @@ export const useAppStore = create<AppState>((set, get) => ({
         break;
       }
 
+      case "session.cloned": {
+        const { session } = event.payload;
+        set((state) => {
+          const existing = state.sessions[session.id] ?? createSession(session.id);
+          return {
+            sessions: {
+              ...state.sessions,
+              [session.id]: {
+                ...existing,
+                id: session.id,
+                title: session.title,
+                status: session.status,
+                cwd: session.cwd,
+                model: session.model,
+                isPinned: session.isPinned,
+                createdAt: session.createdAt,
+                updatedAt: session.updatedAt,
+                inputTokens: session.inputTokens,
+                outputTokens: session.outputTokens,
+                charter: session.charter,
+                charterHash: session.charterHash,
+                adrs: session.adrs,
+                hydrated: false
+              }
+            },
+            showStartModal: false
+          };
+        });
+        get().setActiveSessionId(session.id);
+        break;
+      }
+
       case "stream.message": {
         const { sessionId, message } = event.payload;
 
