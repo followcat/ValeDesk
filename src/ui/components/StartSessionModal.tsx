@@ -103,14 +103,17 @@ export function StartSessionModal({
   // Set default model: schedulerDefaultModel > apiSettings.model
   useEffect(() => {
     if (!selectedModel) {
-      // Prioritize scheduler default model if set
       if (schedulerDefaultModel) {
-        onModelChange(schedulerDefaultModel);
+        const idByName = allAvailableModels.find(m => m.name === schedulerDefaultModel)?.id;
+        const modelId = schedulerDefaultModel.includes("::")
+          ? schedulerDefaultModel
+          : (idByName ?? schedulerDefaultModel);
+        onModelChange(modelId);
       } else if (apiSettings?.model) {
         onModelChange(apiSettings.model);
       }
     }
-  }, [apiSettings, selectedModel, onModelChange, schedulerDefaultModel]);
+  }, [apiSettings, selectedModel, onModelChange, schedulerDefaultModel, allAvailableModels]);
 
   // Set default temperature from scheduler defaults
   useEffect(() => {
@@ -359,21 +362,37 @@ export function StartSessionModal({
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
-            {/* Set as default for scheduled tasks */}
+            {/* Set as default for scheduled tasks (store API model name, not internal id) */}
             {selectedModel && (
               <div className="flex items-center justify-between mt-1">
                 <span className="text-[10px] text-muted">
-                  {schedulerDefaultModel === selectedModel 
-                    ? t("startSession.defaultForScheduled") 
-                    : ""}
+                  {(() => {
+                    const apiModelName = allAvailableModels.find(m => m.id === selectedModel)?.name ?? selectedModel;
+                    const isProviderModel = Boolean(selectedModel && selectedModel.includes("::"));
+                    const defaultMatch = isProviderModel
+                      ? schedulerDefaultModel === selectedModel
+                      : schedulerDefaultModel === apiModelName;
+                    return defaultMatch
+                      ? t("startSession.defaultForScheduled")
+                      : "";
+                  })()}
                 </span>
-                {schedulerDefaultModel !== selectedModel && (
+                {(() => {
+                  const apiModelName = allAvailableModels.find(m => m.id === selectedModel)?.name ?? selectedModel;
+                  const isProviderModel = Boolean(selectedModel && selectedModel.includes("::"));
+                  const defaultMatch = isProviderModel
+                    ? schedulerDefaultModel === selectedModel
+                    : schedulerDefaultModel === apiModelName;
+                  return !defaultMatch;
+                })() && (
                   <button
                     type="button"
                     onClick={() => {
+                      const apiModelName = allAvailableModels.find(m => m.id === selectedModel)?.name ?? selectedModel;
+                      const modelId = selectedModel?.includes("::") ? selectedModel : apiModelName;
                       getPlatform().sendClientEvent({
                         type: "scheduler.default_model.set",
-                        payload: { modelId: selectedModel }
+                        payload: { modelId }
                       } as ClientEvent);
                     }}
                     className="text-[10px] text-accent hover:text-accent-hover transition-colors"

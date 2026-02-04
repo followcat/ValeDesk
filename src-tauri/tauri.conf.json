@@ -4,6 +4,7 @@
   "version": "0.0.8",
   "identifier": "com.vakovalskii.valera",
   "build": {
+    "beforeBuildCommand": "npm run build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist-react"
   },

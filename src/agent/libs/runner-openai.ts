@@ -287,11 +287,11 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
         providerInfo = `${provider.name} (${provider.type})`;
         modelContextLength = llmSettings?.models?.find(m => m.id === modelId && m.providerId === providerId)?.contextLength;
       } else {
-        // Use legacy API settings
+        // Use legacy API settings (apiKey/baseURL from file; model from session or file)
         const guiSettings = loadApiSettings();
         
-        if (!guiSettings || !guiSettings.baseUrl || !guiSettings.model) {
-          throw new Error('API settings not configured. Please set API Key, Base URL and Model in Settings (⚙️).');
+        if (!guiSettings || !guiSettings.baseUrl) {
+          throw new Error('API settings not configured. Please set Base URL (and API Key) in Settings (⚙️).');
         }
         
         if (!guiSettings.apiKey) {
@@ -300,10 +300,18 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
 
         apiKey = guiSettings.apiKey;
         baseURL = guiSettings.baseUrl;
-        modelName = guiSettings.model;
+        modelName = session.model || guiSettings.model || '';
+        if (!modelName) {
+          throw new Error('Model not set. Set default model in Settings or Scheduler default model (⚙️).');
+        }
         temperature = session.temperature; // undefined means don't send
         providerInfo = 'Legacy API';
         modelContextLength = undefined;
+      }
+
+      const debug = !!(process.env.VALERA_DEBUG || process.env.DEBUG);
+      if (debug) {
+        console.error('[OpenAI Runner] Debug: session.model=%s modelName=%s baseURL=%s provider=%s', session.model ?? '', modelName, baseURL, providerInfo);
       }
       
       // Load legacy settings for other configuration (tools, permissions, etc)
@@ -865,6 +873,10 @@ export async function runOpenAI(options: RunnerOptions): Promise<RunnerHandle> {
             let streamMetadata: { id?: string; model?: string; created?: number; finishReason?: string; usage?: any } = {};
 
             try {
+              if (debug) {
+                const reqUrl = `${baseURL.replace(/\/$/, '')}/chat/completions`;
+                console.error('[OpenAI Runner] Debug: request model=%s url=%s', modelName, reqUrl);
+              }
               const stream = await client.chat.completions.create({
                 model: modelName,
                 messages: requestMessages as any[],

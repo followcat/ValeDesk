@@ -65,7 +65,15 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
     if (activeSessionId && !trimmedPrompt && !hasAttachments) return;
 
     if (!activeSessionId) {
-      // Starting new session - can be empty for chat-only mode
+      // Resolve selected model to API model name for legacy models (provider IDs keep :: form)
+      const state = useAppStore.getState();
+      const apiModelName = state.llmModels?.find(m => m.id === selectedModel)?.name
+        ?? state.availableModels?.find(m => m.id === selectedModel)?.name
+        ?? selectedModel;
+      const isProviderModel = Boolean(selectedModel && selectedModel.includes("::"));
+      const sessionModel = isProviderModel ? selectedModel : (apiModelName || selectedModel);
+      const defaultModelId = isProviderModel ? selectedModel : apiModelName;
+
       setPendingStart(true);
       
       // Keep default title so backend can auto-generate when prompt exists
@@ -80,17 +88,17 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
           prompt: trimmedPrompt, // Can be empty string
           cwd: cwd.trim() || undefined,
           allowedTools: DEFAULT_ALLOWED_TOOLS,
-          model: selectedModel || undefined,
+          model: sessionModel || undefined,
           temperature: sendTemperature ? selectedTemperature : undefined,
           enableSessionGitRepo: options?.enableSessionGitRepo ?? apiSettings?.enableSessionGitRepo ?? false,
           attachments: hasAttachments ? attachments : undefined
         }
       });
-      // Save selected model as default for future sessions
-      if (selectedModel) {
+      // Save model id for future sessions (provider IDs keep :: form)
+      if (defaultModelId) {
         sendEvent({
           type: "scheduler.default_model.set",
-          payload: { modelId: selectedModel }
+          payload: { modelId: defaultModelId }
         } as ClientEvent);
       }
       // Save temperature as default for future sessions
