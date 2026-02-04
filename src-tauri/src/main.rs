@@ -1437,8 +1437,16 @@ fn client_event(app: tauri::AppHandle, state: tauri::State<'_, AppState>, event:
         .and_then(|v| v.as_str())
         .ok_or_else(|| "[session.clone] missing sessionId".to_string())?;
 
-      match state.db.clone_session(session_id) {
+      let conversations_dir = get_default_conversations_dir().ok();
+      match state.db.clone_session(session_id, conversations_dir.as_deref()) {
         Ok(Some(session)) => {
+          // Best-effort create the auto session cwd on disk (only when it's under Conversations/{sessionId}).
+          if let (Some(cwd), Some(base)) = (session.cwd.as_ref(), conversations_dir.as_deref()) {
+            if std::path::PathBuf::from(cwd) == std::path::PathBuf::from(base).join(&session.id) {
+              let _ = std::fs::create_dir_all(cwd);
+            }
+          }
+
           emit_server_event_app(&app, &json!({
             "type": "session.cloned",
             "payload": { "session": session }

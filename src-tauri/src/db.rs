@@ -1,7 +1,33 @@
 use rusqlite::{Connection, params, Result as SqliteResult};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+
+fn rewrite_message_fields(value: &mut serde_json::Value, source_id: &str, new_id: &str, source_cwd: Option<&str>, new_cwd: Option<&str>) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (k, v) in map.iter_mut() {
+                if (k == "session_id" || k == "sessionId") && v.as_str() == Some(source_id) {
+                    *v = serde_json::Value::String(new_id.to_string());
+                }
+                if k == "cwd" {
+                    if let (Some(src), Some(dst)) = (source_cwd, new_cwd) {
+                        if v.as_str() == Some(src) {
+                            *v = serde_json::Value::String(dst.to_string());
+                        }
+                    }
+                }
+                rewrite_message_fields(v, source_id, new_id, source_cwd, new_cwd);
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr.iter_mut() {
+                rewrite_message_fields(item, source_id, new_id, source_cwd, new_cwd);
+            }
+        }
+        _ => {}
+    }
+}
 
 pub struct Database {
     conn: Mutex<Connection>,
@@ -187,7 +213,7 @@ impl Database {
         })
     }
 
-    pub fn clone_session(&self, source_id: &str) -> SqliteResult<Option<Session>> {
+    pub fn clone_session(&self, source_id: &str, conversations_dir: Option<&str>) -> SqliteResult<Option<Session>> {
         let now = chrono::Utc::now().timestamp_millis();
 
         // IMPORTANT: fetch source session outside the DB lock to avoid deadlocks.
@@ -198,6 +224,15 @@ impl Database {
 
         let new_id = uuid::Uuid::new_v4().to_string();
         let new_title = format!("{} (clone)", source.title);
+
+        let source_cwd = source.cwd.clone();
+        let mut new_cwd = source.cwd.clone();
+        if let (Some(base), Some(src)) = (conversations_dir, source_cwd.as_deref()) {
+            let expected = PathBuf::from(base).join(source_id);
+            if PathBuf::from(src) == expected {
+                new_cwd = Some(PathBuf::from(base).join(&new_id).to_string_lossy().to_string());
+            }
+        }
 
         {
             let mut conn = self.conn.lock().unwrap();
@@ -233,7 +268,7 @@ impl Database {
                 params![
                     &new_id,
                     &new_title,
-                    &source.cwd,
+                    &new_cwd,
                     &source.allowed_tools,
                     &source.last_prompt,
                     &source.model,
@@ -263,9 +298,18 @@ impl Database {
                 for row in rows {
                     let (data, created_at) = row?;
                     let msg_id = uuid::Uuid::new_v4().to_string();
+
+                    let rewritten = match serde_json::from_str::<serde_json::Value>(&data) {
+                        Ok(mut value) => {
+                            rewrite_message_fields(&mut value, source_id, &new_id, source_cwd.as_deref(), new_cwd.as_deref());
+                            serde_json::to_string(&value).unwrap_or_else(|_| data.clone())
+                        }
+                        Err(_) => data.clone(),
+                    };
+
                     tx.execute(
                         "INSERT INTO messages (id, session_id, data, created_at) VALUES (?1, ?2, ?3, ?4)",
-                        params![&msg_id, &new_id, &data, created_at],
+                        params![&msg_id, &new_id, &rewritten, created_at],
                     )?;
                 }
             }
