@@ -292,14 +292,18 @@ export const summarizeInStages = async (params: {
   const partials: string[] = [];
 
   for (const chunk of chunks) {
-    const summary = await callSummarizer(
-      params.client,
-      params.model,
-      params.instructions,
-      chunk,
-      params.maxOutputTokens
-    );
-    if (summary) partials.push(summary);
+    try {
+      const summary = await callSummarizer(
+        params.client,
+        params.model,
+        params.instructions,
+        chunk,
+        params.maxOutputTokens
+      );
+      if (summary) partials.push(summary);
+    } catch (error) {
+      console.warn(`[context-manager] Skipping chunk (${chunk.length} chars) after summarizer error`);
+    }
   }
 
   if (partials.length === 0) return "";
