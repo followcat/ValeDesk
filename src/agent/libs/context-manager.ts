@@ -289,22 +289,22 @@ export const summarizeInStages = async (params: {
   maxTargetTokens: number;
 }): Promise<string> => {
   const chunks = splitTextByTokens(params.text, params.maxChunkTokens);
-  const partials: string[] = [];
-
-  for (const chunk of chunks) {
-    try {
-      const summary = await callSummarizer(
-        params.client,
-        params.model,
-        params.instructions,
-        chunk,
-        params.maxOutputTokens
-      );
-      if (summary) partials.push(summary);
-    } catch (error) {
-      console.warn(`[context-manager] Skipping chunk (${chunk.length} chars) after summarizer error`);
-    }
-  }
+  const partials = (await Promise.all(
+    chunks.map(async (chunk) => {
+      try {
+        return await callSummarizer(
+          params.client,
+          params.model,
+          params.instructions,
+          chunk,
+          params.maxOutputTokens
+        );
+      } catch (error) {
+        console.warn(`[context-manager] Skipping chunk (${chunk.length} chars) after summarizer error`);
+        return "";
+      }
+    })
+  )).filter(Boolean);
 
   if (partials.length === 0) return "";
   if (partials.length === 1) return partials[0];
@@ -347,8 +347,11 @@ export const runMemoryFlush = async (params: {
   if (!transcript.trim()) return false;
 
   // Pre-truncate transcript to avoid sending oversized content to the summarizer API.
-  // Limit to contextWindowTokens * AVG_CHARS_PER_TOKEN / 2 to leave room for output.
-  const maxTranscriptChars = Math.floor(params.config.contextWindowTokens * AVG_CHARS_PER_TOKEN / 2);
+  // Cap at ~5 chunks worth of content to keep compaction fast.
+  const maxTranscriptChars = Math.min(
+    params.config.maxChunkTokens * AVG_CHARS_PER_TOKEN * 5,
+    Math.floor(params.config.contextWindowTokens * AVG_CHARS_PER_TOKEN / 2)
+  );
   const trimmedTranscript = transcript.length > maxTranscriptChars
     ? transcript.slice(0, Math.floor(maxTranscriptChars * 0.3))
       + "\n\n... [middle omitted] ...\n\n"
@@ -406,7 +409,10 @@ export const summarizeForCompaction = async (params: {
   if (!transcript.trim()) return "";
 
   // Pre-truncate transcript to avoid oversized API requests
-  const maxTranscriptChars = Math.floor(params.config.contextWindowTokens * AVG_CHARS_PER_TOKEN / 2);
+  const maxTranscriptChars = Math.min(
+    params.config.maxChunkTokens * AVG_CHARS_PER_TOKEN * 5,
+    Math.floor(params.config.contextWindowTokens * AVG_CHARS_PER_TOKEN / 2)
+  );
   const trimmedTranscript = transcript.length > maxTranscriptChars
     ? transcript.slice(0, Math.floor(maxTranscriptChars * 0.3))
       + "\n\n... [middle omitted] ...\n\n"
