@@ -235,20 +235,47 @@ const callSummarizer = async (
   model: string,
   systemPrompt: string,
   userContent: string,
-  maxTokens: number
+  maxTokens: number,
+  retries = 2
 ): Promise<string> => {
-  const response = await client.chat.completions.create({
-    model,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userContent }
-    ],
-    temperature: 0.2,
-    max_tokens: Math.max(128, Math.min(maxTokens, 2048))
-  });
+  const outputTokens = Math.max(128, Math.min(maxTokens, 2048));
+  let content = userContent;
 
-  const text = response.choices[0]?.message?.content ?? "";
-  return text.trim();
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: content }
+        ],
+        temperature: 0.2,
+        max_tokens: outputTokens
+      });
+
+      const text = response.choices[0]?.message?.content ?? "";
+      return text.trim();
+    } catch (error: any) {
+      const isContextLimitError =
+        error?.status === 400 &&
+        typeof error?.error?.message === "string" &&
+        (error.error.message.includes("max_tokens") ||
+          error.error.message.includes("context length") ||
+          error.error.message.includes("model output limit"));
+
+      if (isContextLimitError && attempt < retries) {
+        // Halve the user content to fit within context limits
+        content = content.slice(0, Math.floor(content.length / 2));
+        console.warn(
+          `[context-manager] Summarizer hit context limit, retrying with ${content.length} chars (attempt ${attempt + 1})`
+        );
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return "";
 };
 
 export const summarizeInStages = async (params: {
