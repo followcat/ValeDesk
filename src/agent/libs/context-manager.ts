@@ -346,6 +346,15 @@ export const runMemoryFlush = async (params: {
   const transcript = params.messages.map(formatStreamMessage).join("\n\n");
   if (!transcript.trim()) return false;
 
+  // Pre-truncate transcript to avoid sending oversized content to the summarizer API.
+  // Limit to contextWindowTokens * AVG_CHARS_PER_TOKEN / 2 to leave room for output.
+  const maxTranscriptChars = Math.floor(params.config.contextWindowTokens * AVG_CHARS_PER_TOKEN / 2);
+  const trimmedTranscript = transcript.length > maxTranscriptChars
+    ? transcript.slice(0, Math.floor(maxTranscriptChars * 0.3))
+      + "\n\n... [middle omitted] ...\n\n"
+      + transcript.slice(-Math.floor(maxTranscriptChars * 0.7))
+    : transcript;
+
   const instructions = [
     "You are preparing a session memory note before context compaction.",
     "Extract durable facts, decisions, file paths, commands, TODOs, and important parameters.",
@@ -361,7 +370,7 @@ export const runMemoryFlush = async (params: {
   const summary = await summarizeInStages({
     client: params.client,
     model: params.model,
-    text: transcript,
+    text: trimmedTranscript,
     instructions,
     mergeInstructions,
     maxChunkTokens: params.config.maxChunkTokens,
@@ -396,6 +405,14 @@ export const summarizeForCompaction = async (params: {
   const transcript = params.messages.map(formatStreamMessage).join("\n\n");
   if (!transcript.trim()) return "";
 
+  // Pre-truncate transcript to avoid oversized API requests
+  const maxTranscriptChars = Math.floor(params.config.contextWindowTokens * AVG_CHARS_PER_TOKEN / 2);
+  const trimmedTranscript = transcript.length > maxTranscriptChars
+    ? transcript.slice(0, Math.floor(maxTranscriptChars * 0.3))
+      + "\n\n... [middle omitted] ...\n\n"
+      + transcript.slice(-Math.floor(maxTranscriptChars * 0.7))
+    : transcript;
+
   const instructions = [
     "Summarize the following conversation history.",
     "Preserve decisions, requirements, file paths, commands, errors, TODOs, and key parameters.",
@@ -409,7 +426,7 @@ export const summarizeForCompaction = async (params: {
   return summarizeInStages({
     client: params.client,
     model: params.model,
-    text: transcript,
+    text: trimmedTranscript,
     instructions,
     mergeInstructions,
     maxChunkTokens: params.config.maxChunkTokens,
